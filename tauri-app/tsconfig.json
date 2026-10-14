@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"], "strict": true, "noEmit": true,
+    "allowJs": true, "checkJs": false, "skipLibCheck": true
+  },
+  "include": ["src/frontend/**/*.ts"]
+}

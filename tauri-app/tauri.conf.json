@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/1.8",
+  "package": {
+    "productName": "llama-server-configurator"
+  },
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "",
+    "devPath": "http://localhost:14200",
+    "distDir": "dist"
+  },
+  "tauri": {
+    "windows": [
+      {
+        "title": "Llama Server Configuration Manager",
+        "width": 1200,
+        "height": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'; connect-src 'self'; media-src 'none'; object-src 'none'; worker-src 'none'; frame-ancestors 'none'"
+    }
+  }
+}

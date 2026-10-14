@@ -1,0 +1,68 @@
+name: Windows and Linux builds
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            toolchain: stable-x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            toolchain: stable
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: tauri-app
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tauri-app/package-lock.json
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf xvfb
+      - name: Rust toolchain
+        run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component rustfmt --component clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri-app -> target
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Rust formatting
+        run: cargo +${{ matrix.toolchain }} fmt --check
+      - name: Rust lints
+        run: cargo +${{ matrix.toolchain }} clippy --all-targets --locked -- -D warnings
+      - name: Native backend tests
+        run: cargo +${{ matrix.toolchain }} test --locked
+      - name: Browser runtime
+        run: npx playwright install --with-deps chromium --only-shell
+      - name: Interface regression checks
+        run: npm run test:gui
+      - name: Interface measurements
+        run: npm run benchmark:gui
+      - name: Native release build
+        run: cargo +${{ matrix.toolchain }} build --release --locked
+      - name: Native Linux window smoke check
+        if: runner.os == 'Linux'
+        run: xvfb-run -a bash tests/linux-window-smoke.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: LLamaLauncher-${{ runner.os }}
+          path: |
+            tauri-app/target/release/llama-server-configurator${{ runner.os == 'Windows' && '.exe' || '' }}
+            tauri-app/artifacts/
+            README.md
+            LICENSE
+          if-no-files-found: error

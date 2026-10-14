@@ -1,0 +1,10 @@
+**/node_modules/
+**/target/
+**/dist/
+**/desktop-app/
+**/artifacts/
+**/.test-fixtures/
+*.bin
+*.log
+.env
+.env.*
