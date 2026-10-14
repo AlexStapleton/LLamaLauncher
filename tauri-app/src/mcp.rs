@@ -247,7 +247,7 @@ impl Drop for StdioSession {
     }
 }
 enum Transport {
-    Http(HttpSession),
+    Http(Box<HttpSession>),
     Stdio(StdioSession),
 }
 pub struct Client {
@@ -257,7 +257,7 @@ pub struct Client {
 impl Client {
     pub fn new(profile: Profile) -> Result<Self, String> {
         let transport = if profile.transport == "http" {
-            Transport::Http(HttpSession::new(profile)?)
+            Transport::Http(Box::new(HttpSession::new(profile)?))
         } else {
             let mut command = Command::new(&profile.command);
             command

@@ -66,3 +66,52 @@ jobs:
             README.md
             LICENSE
           if-no-files-found: error
+      - name: Package release binary
+        if: github.ref == 'refs/tags/1.0'
+        shell: python
+        run: |
+          import pathlib
+          import zipfile
+          platform = "${{ runner.os }}"
+          binary = pathlib.Path("target/release/llama-server-configurator" + (".exe" if platform == "Windows" else ""))
+          with zipfile.ZipFile(f"LLamaLauncher-1.0-{platform}-x86_64.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+              archive.write(binary, binary.name)
+              for document in ("README.md", "LICENSE"):
+                  archive.write(pathlib.Path("..") / document, document)
+      - uses: actions/upload-artifact@v7
+        if: github.ref == 'refs/tags/1.0'
+        with:
+          name: release-assets-${{ runner.os }}
+          path: tauri-app/LLamaLauncher-1.0-*.zip
+          if-no-files-found: error
+  release:
+    if: github.ref == 'refs/tags/1.0'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-assets-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish release 1.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          LLamaLauncher 1.0: a desktop launcher and configurator for llama.cpp.
+
+          Includes model discovery, single-model and router modes, named launch profiles, MCP connection testing and tool discovery, and owned process cleanup.
+
+          Download the archive for Windows x86_64 or Linux x86_64 and extract it. Windows requires WebView2 Runtime. Linux requires GTK 3 and WebKitGTK 4.0 (Ubuntu 22.04 is the validated build platform). llama-server and model weights are supplied separately. See the included README for setup and profile storage details.
+
+          Both platform builds and their checks must pass before this release is published. MCP checks do not invoke discovered tools; no model inference is part of release validation.
+          EOF
+          if gh release view 1.0 >/dev/null 2>&1; then
+            gh release upload 1.0 release-assets/*.zip --clobber
+          else
+            gh release create 1.0 release-assets/*.zip --verify-tag --title "LLamaLauncher 1.0" --notes-file release-notes.md
+          fi

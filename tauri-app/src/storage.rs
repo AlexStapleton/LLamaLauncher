@@ -14,7 +14,7 @@ fn profile_path() -> PathBuf {
                 PathBuf::from(std::env::var_os("HOME").unwrap_or_else(|| ".".into()))
                     .join(".config")
             });
-        return base.join("llama-launcher").join("mcp-profile.bin");
+        base.join("llama-launcher").join("mcp-profile.bin")
     }
     #[cfg(windows)]
     {
