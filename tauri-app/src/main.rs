@@ -1604,6 +1604,8 @@ mod tests {
     use super::*;
     #[cfg(target_os = "linux")]
     #[test]
+    // Exercise consuming last() as well as next_back() in the optimized FFI regression.
+    #[allow(clippy::double_ended_iterator_last)]
     fn glib_backport_string_iterator_is_sound_in_optimized_builds() {
         use glib::variant::ToVariant;
         let value = vec!["first", "middle", "last"].to_variant();
