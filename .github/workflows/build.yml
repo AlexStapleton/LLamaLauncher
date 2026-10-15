@@ -36,6 +36,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tauri-app -> target
+          cache-on-failure: true
       - run: npm ci
       - run: npm test
       - run: node tests/generate-settings-guide.mjs --check

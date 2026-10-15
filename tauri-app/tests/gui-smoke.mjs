@@ -149,7 +149,7 @@ try {
   await openSection('Models & downloads');
   await page.locator('#models_native_options > summary').click();
   await page.locator('#models_native_options input[type=search]').fill('--lora');
-  await page.locator('#models_native_options .option-card').first().waitFor();
+  await page.locator('#models_native_options .option-category').filter({hasText:/^--lora ·/}).waitFor();
   assert.ok(await page.locator('#models_native_options .option-category').filter({hasText:/^--lora ·/}).count());
   await openSection('All options');
   assert.equal(await page.locator('.option-card').count(),expected);
