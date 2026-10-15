@@ -81,6 +81,7 @@ jobs:
             tauri-app/target/release/llama-server-configurator${{ runner.os == 'Windows' && '.exe' || '' }}
             tauri-app/artifacts/gui-*.png
             tauri-app/artifacts/gui-benchmark*.json
+            tauri-app/artifacts/native-package-startup.json
             tauri-app/artifacts/THIRD_PARTY_NOTICES.txt
             README.md
             LICENSE
