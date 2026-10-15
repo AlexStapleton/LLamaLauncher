@@ -2,6 +2,7 @@
 **/target/
 **/dist/
 **/desktop-app/
+**/data/
 **/artifacts/
 **/.test-fixtures/
 *.bin

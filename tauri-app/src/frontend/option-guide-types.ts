@@ -1,0 +1,1 @@
+export interface OptionGuide {flag:string;title:string;tab:string;category:string;group:string;summary:string;change:string;scale:string;speed:string;vram:string;ram:string;sources:string[];reviewed:boolean}

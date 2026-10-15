@@ -5,11 +5,16 @@ fixture="$(mktemp -d)"
 export XDG_CONFIG_HOME="$fixture/config"
 export XDG_CACHE_HOME="$fixture/cache"
 export XDG_DATA_HOME="$fixture/data"
+export LLAMA_LAUNCHER_DATA_DIR="$fixture/launcher-data"
 export XDG_RUNTIME_DIR="$fixture/runtime"
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 export WEBKIT_DISABLE_DMABUF_RENDERER=1
-target/release/llama-server-configurator >"$fixture/stdout" 2>"$fixture/stderr" &
+if [[ $# -gt 0 ]]; then
+  "$1" --appimage-extract-and-run >"$fixture/stdout" 2>"$fixture/stderr" &
+else
+  target/release/llama-server-configurator >"$fixture/stdout" 2>"$fixture/stderr" &
+fi
 launcher_pid=$!
 trap 'kill "$launcher_pid" 2>/dev/null || true; wait "$launcher_pid" 2>/dev/null || true' EXIT
 sleep 5

@@ -3,8 +3,41 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseHelp, valuesFor, buildOverrides } from '../src/frontend/option-catalog.js';
 import { impactFor } from '../src/frontend/option-impact.js';
+import { guideFor, reviewedGuides } from '../src/frontend/option-guide.js';
 const help = readFileSync(new URL('../src/frontend/server-help.txt', import.meta.url), 'utf8');
 const catalog = parseHelp(help);
+
+test('every bundled setting has reviewed, sourced, actionable help',()=>{
+  assert.equal(catalog.length,257);
+  for(const option of catalog){
+    const guide=guideFor(option);assert.equal(guide.reviewed,true,option.flag);
+    for(const key of ['summary','change','scale'])assert.ok(guide[key].length>35,`${option.flag}: ${key}`);
+    assert.ok(guide.sources.every(url=>url.startsWith('https://github.com/ggml-org/llama.cpp/blob/')));
+    for(const alias of option.aliases)assert.equal(guideFor({flag:alias,aliases:option.aliases}).tab,guide.tab);
+  }
+  assert.equal(reviewedGuides.size,257);
+});
+
+test('placement follows purpose rather than incidental words in flag names',()=>{
+  for(const [flag,tab] of Object.entries({'--chat-template':'chat','--chat-template-kwargs':'chat','--no-host':'gpu','--spec-draft-device':'advanced','--spec-draft-cpu-mask':'advanced','--cache-type-k':'context','--cache-type-v':'context','--ctx-size':'context','--threads-http':'api','--pooling':'api','--sleep-idle-seconds':'models','--mcp-servers-json':'mcp','--log-file':'logs'})){
+    assert.equal(guideFor({flag}).tab,tab,flag);
+  }
+});
+
+test('magnitudes distinguish cache components from weights and avoid speed promises',()=>{
+  assert.match(guideFor({flag:'--cache-type-k'}).scale,/53%.*28%/);
+  assert.match(guideFor({flag:'--cache-type-v'}).scale,/77% combined/);
+  assert.match(guideFor({flag:'--ctx-size'}).scale,/2× KV capacity, not 2× total memory/);
+  assert.match(guideFor({flag:'--gpu-layers'}).scale,/not a guaranteed 2× speedup/);
+  const unknown=guideFor({flag:'--future-version-setting'});
+  assert.equal(unknown.reviewed,false);assert.equal(unknown.tab,'advanced');assert.match(unknown.scale,/No numerical/);
+});
+
+test('dotted preset names and older aliases stay intact',()=>{
+  const preset=catalog.find(option=>option.flag==='--fim-qwen-1.5b-default');
+  assert.ok(preset);assert.equal(preset.syntax,'');assert.equal(guideFor(preset).reviewed,true);
+  assert.equal(guideFor({flag:'--n-predict'}).flag,'--predict');
+});
 test('every installed help entry is represented, including wrapped headers', () => {
   const headers = help.split(/\r?\n/).filter(line => /^-{1,2}[A-Za-z]/.test(line));
   assert.equal(catalog.length, headers.length);

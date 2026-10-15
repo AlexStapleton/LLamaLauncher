@@ -38,6 +38,8 @@ jobs:
           workspaces: tauri-app -> target
       - run: npm ci
       - run: npm test
+      - run: node tests/generate-settings-guide.mjs --check
+      - run: node tests/verify-glib-backport.mjs
       - run: npm run typecheck
       - run: npm run build
       - name: Rust formatting
@@ -45,7 +47,7 @@ jobs:
       - name: Rust lints
         run: cargo +${{ matrix.toolchain }} clippy --all-targets --locked -- -D warnings
       - name: Native backend tests
-        run: cargo +${{ matrix.toolchain }} test --locked
+        run: cargo +${{ matrix.toolchain }} test --release --locked
       - name: Browser runtime
         run: npx playwright install --with-deps chromium --only-shell
       - name: Interface regression checks
@@ -57,61 +59,46 @@ jobs:
       - name: Native Linux window smoke check
         if: runner.os == 'Linux'
         run: xvfb-run -a bash tests/linux-window-smoke.sh
+      - name: Package Windows release with fixed WebView2
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+        shell: pwsh
+        run: ./release-windows.ps1
+      - name: Package native Linux release
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+        run: bash release-linux.sh
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+        with:
+          name: release-assets-${{ runner.os }}
+          path: tauri-app/artifacts/release/*
+          compression-level: 0
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: LLamaLauncher-${{ runner.os }}
           path: |
             tauri-app/target/release/llama-server-configurator${{ runner.os == 'Windows' && '.exe' || '' }}
-            tauri-app/artifacts/
+            tauri-app/artifacts/gui-*.png
+            tauri-app/artifacts/gui-benchmark*.json
+            tauri-app/artifacts/THIRD_PARTY_NOTICES.txt
             README.md
             LICENSE
           if-no-files-found: error
-      - name: Package release binary
-        if: github.ref == 'refs/tags/1.0'
-        shell: python
-        run: |
-          import pathlib
-          import zipfile
-          platform = "${{ runner.os }}"
-          binary = pathlib.Path("target/release/llama-server-configurator" + (".exe" if platform == "Windows" else ""))
-          with zipfile.ZipFile(f"LLamaLauncher-1.0-{platform}-x86_64.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-              archive.write(binary, binary.name)
-              for document in ("README.md", "LICENSE"):
-                  archive.write(pathlib.Path("..") / document, document)
-      - uses: actions/upload-artifact@v7
-        if: github.ref == 'refs/tags/1.0'
-        with:
-          name: release-assets-${{ runner.os }}
-          path: tauri-app/LLamaLauncher-1.0-*.zip
-          if-no-files-found: error
   release:
-    if: github.ref == 'refs/tags/1.0'
     needs: build
-    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
+      actions: read
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/checkout@v7
         with:
-          pattern: release-assets-*
-          merge-multiple: true
-          path: release-assets
-      - name: Publish release 1.0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Publish verified 1.1 archives and checksums
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          cat > release-notes.md <<'EOF'
-          LLamaLauncher 1.0: a desktop launcher and configurator for llama.cpp.
-
-          Includes model discovery, single-model and router modes, named launch profiles, MCP connection testing and tool discovery, and owned process cleanup.
-
-          Download the archive for Windows x86_64 or Linux x86_64 and extract it. Windows requires WebView2 Runtime. Linux requires GTK 3 and WebKitGTK 4.0 (Ubuntu 22.04 is the validated build platform). llama-server and model weights are supplied separately. See the included README for setup and profile storage details.
-
-          Both platform builds and their checks must pass before this release is published. MCP checks do not invoke discovered tools; no model inference is part of release validation.
-          EOF
-          if gh release view 1.0 >/dev/null 2>&1; then
-            gh release upload 1.0 release-assets/*.zip --clobber
-          else
-            gh release create 1.0 release-assets/*.zip --verify-tag --title "LLamaLauncher 1.0" --notes-file release-notes.md
-          fi
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node tauri-app/tests/publish-release.mjs

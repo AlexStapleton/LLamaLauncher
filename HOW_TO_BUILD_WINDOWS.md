@@ -1,114 +1,89 @@
-# How to build the Windows GUI — instructions for Pi
+# Build the Windows application
 
-Use this procedure for the active Tauri application. It was successfully built on this desktop using the installed **MSVC** Rust toolchain. The default **GNU** toolchain on this machine fails with `dlltool` errors.
+Use the Rust/Tauri application in `tauri-app`. These instructions also apply to Pi and other build harnesses. Read [AGENTS.md](AGENTS.md) before changing source.
 
-## 1. Work in the correct directory
+## Prerequisites
 
-Open PowerShell and run:
+- Node.js 22.12 or later and npm.
+- Rust 1.89 or later, using the stable Windows MSVC toolchain.
+- Visual Studio C++ Build Tools, the desktop C++ workload and Windows SDK.
+- WebView2 Runtime for an ordinary executable build, or the official Fixed Version x64 runtime for a portable ZIP.
 
-```powershell
-Set-Location 'C:\Users\Ziggity\Documents\Pi\llam-server-rust\LLamaLauncher\tauri-app'
-```
-
-Close all running **Llama Server Configurator** windows before rebuilding or copying the executable. An open executable cannot be replaced on Windows. Coordinate with the user before closing an instance that may be managing a server.
-
-Avoid concurrent edits or builds by multiple harnesses. Read the current files before changing them.
-
-## 2. Check prerequisites
+Check the selected toolchain:
 
 ```powershell
 node --version
-npm --version
 rustup toolchain list
 cargo +stable-x86_64-pc-windows-msvc --version
 ```
 
-This desktop already has the MSVC Rust toolchain, Microsoft C++ build tools, Windows resource compiler, and WebView2 Runtime. The GUI was launched successfully here. Do not reinstall prerequisites merely because the GNU build fails.
+The reviewed desktop's default GNU toolchain fails with missing MinGW/dlltool dependencies. Selecting MSVC resolves that environment issue; reinstalling MinGW is not required for this build.
 
-For a different machine, install the Windows MSVC Rust toolchain and Visual Studio Build Tools with the C++ desktop workload and Windows SDK. WebView2 Runtime is required to run the GUI.
+## Build
 
-If `node_modules` is absent, restore frontend dependencies with `npm ci`. This needs package-registry access. Do not manually edit installed dependencies.
-
-## 3. Build the desktop executable
-
-The recommended command is:
+From the repository root:
 
 ```powershell
+Set-Location .\tauri-app
+npm ci
 .\build-windows.ps1
 ```
 
-The script builds the frontend, builds the release executable with MSVC, checks command exit codes, and copies the executable into `desktop-app`.
+The script checks frontend tests, builds embedded frontend assets, checks Rust, builds with MSVC and copies the EXE to `desktop-app/llama-server-configurator.exe`. No Node server is needed at runtime. Close a running copy before replacing its EXE; coordinate first if it owns a server. Do not run competing source edits/builds from multiple harnesses.
 
-If script execution is blocked, run these commands individually instead; no execution-policy change is needed:
-
-```powershell
-npm run build
-```
-
-Check that it exits successfully before continuing:
-
-```powershell
-cargo +stable-x86_64-pc-windows-msvc build --release --locked
-```
-
-Check that it exits successfully before copying:
-
-```powershell
-New-Item -ItemType Directory -Path '.\desktop-app' -Force | Out-Null
-Copy-Item -LiteralPath '.\target\release\llama-server-configurator.exe' -Destination '.\desktop-app\llama-server-configurator.exe' -Force
-```
-
-For a build using already cached dependencies, add `--offline` to the Cargo command. If a dependency is missing from the cache, use the ordinary command with network access.
-
-Never report success based only on an existing executable: it may be left from an older build. Check the build exit code and the executable's timestamp.
-
-## 4. Verify the result
+If script execution is restricted, use the commands directly:
 
 ```powershell
 npm test
-cargo +stable-x86_64-pc-windows-msvc test --release --locked
-Get-Item '.\desktop-app\llama-server-configurator.exe' | Format-List FullName,Length,LastWriteTime
+npm run build
+cargo +stable-x86_64-pc-windows-msvc check --locked
+cargo +stable-x86_64-pc-windows-msvc build --release --locked
+New-Item -ItemType Directory -Path .\desktop-app -Force | Out-Null
+Copy-Item -LiteralPath .\target\release\llama-server-configurator.exe -Destination .\desktop-app\llama-server-configurator.exe -Force
 ```
 
-Run `desktop-app\llama-server-configurator.exe` by double-clicking it. Confirm:
+Check each exit code before continuing; an existing binary may be stale. With cached dependencies, Cargo can use `--offline`. Let Cargo regenerate the lockfile for intentional dependency changes, then return to `--locked`; never edit it manually. Build frontend assets before Rust: plain Cargo does not run Vite automatically.
 
-- A window titled **Llama Server Configuration Manager** opens.
-- Start and Stop are always visible in the header, and the navigation tabs do not move when settings scroll. Stop is disabled when no app-owned process is running.
-- Selecting a models folder populates the GGUF dropdown, including nested folders. Selecting a model updates the summary and launch command.
-- Settings tabs respond, and Browse opens a native Windows file picker.
-- All options reads the selected executable's `--help`; every option has a description and speed/VRAM/RAM guidance. The bundled snapshot has 257 groups and 414 flag names.
-- Save JSON and Load JSON preserve the model selection and enabled overrides. Logs shows recent server output.
+## Verification
 
-The existing desktop shortcut **Llama Server Configurator** points to this `desktop-app` executable. Refreshing that executable updates what the shortcut launches.
+Run from `tauri-app`:
 
-To test actual server operation, select a separate Windows `llama-server.exe`, a models directory, and a GGUF model inside that directory. Start and stop the server, and inspect its logs if it exits. Compiling or opening the GUI does not prove model inference works. Actual inference has not been verified in the current session.
+```powershell
+node tests/verify-glib-backport.mjs
+npm run typecheck
+cargo +stable-x86_64-pc-windows-msvc fmt --check
+cargo +stable-x86_64-pc-windows-msvc clippy --all-targets --locked -- -D warnings
+cargo +stable-x86_64-pc-windows-msvc test --release --locked
+npx playwright install chromium --only-shell
+npm run test:gui
+Get-Item .\desktop-app\llama-server-configurator.exe | Format-List FullName,Length,LastWriteTime
+```
 
-## Troubleshooting observed failures
+Browser checks use mocked services/native event callbacks. Real checks use `tests/native-features.mjs` with `LLAMA_LAUNCHER_EXE`, `LLAMA_SERVER_EXE` and optionally `LLAMA_FIXED_WEBVIEW`; they use isolated data and public fixtures. See [AGENTS.md](AGENTS.md) and [the readiness review](PRODUCTION_READINESS_REVIEW.md) for evidence and remaining gates.
 
-| Error | Meaning and action |
+After editing option placement or descriptions, run `node tests/generate-settings-guide.mjs` from `tauri-app`, then `node tests/generate-settings-guide.mjs --check`. The [settings reference](LLAMA_SETTINGS_GUIDE.md) and UI use the same metadata. Syntax/defaults still come from the installed executable, and unknown flags must remain explicitly unreviewed.
+
+Windows validation passed real inference, two-model router accounting, monitoring off, runtime install failure/retry, repeated start/stop and folder relocation. Opening the GUI alone does not prove inference works. No MCP tools are executed by verification.
+
+## Portable package
+
+From `tauri-app`, supply the extracted official x64 Fixed Version WebView2 folder:
+
+```powershell
+.\package-portable.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
+```
+
+The packager includes the EXE, Fixed WebView2, licensed VC runtime DLLs, dependency notices and checksums. Engines, models and private data are excluded. For an already verified binary, `-SkipBuild -ExecutablePath 'target/release/llama-server-configurator.exe'` avoids replacing an open desktop copy. Read [PORTABLE_RELEASES.md](PORTABLE_RELEASES.md) for inputs, signing policy and clean-machine requirements.
+
+## Common failures
+
+| Failure | Action |
 |---|---|
-| `dlltool` missing or unable to create an import library | The command selected the Windows GNU toolchain. Use `cargo +stable-x86_64-pc-windows-msvc ...`. This desktop can build the program with MSVC. |
-| `Could not resolve entry module "index.html"` | Check `vite.config.js`: its root is `./src/frontend`; use Vite's default HTML entry. The output must be `../../dist` relative to that root, which is `tauri-app/dist`. |
-| Unknown `productName` or `tauri.app` field | Tauri 1 uses `package.productName`, `tauri.windows`, and `tauri.security`. Follow repository restrictions for correcting the configuration; preserve CSP. |
-| Tauri features do not match the allowlist | Do not restore `api-all`, `dialog-all`, `fs-all`, `shell-open`, or `system-tray` indiscriminately. Current Cargo features are `wry` and `dialog`; the app uses its own Rust commands for browsing and JSON save/load. |
-| `RC2175`, ICO not in 3.00 format | `icons/icon.ico` must be a real Windows ICO, not renamed image data or a placeholder. A working icon is already present. |
-| `EPERM`, `Access is denied`, or unable to remove/copy an EXE | Check whether the configurator is running. A sandbox can also block Vite path resolution or WebView2's dependency build; request an approved build outside that sandbox. Do not label a sandbox error as a Rust code defect. |
-| Cargo says the lockfile must change | For an intentional dependency/feature change, let Cargo regenerate it with a build without `--locked` (optionally `--offline` if dependencies are cached). Never hand-edit `Cargo.lock`. Return to `--locked` for repeatable builds. |
-| `tauri_plugin_dialog`, `tauri_plugin_fs`, or `tauri_plugin_shell` unresolved | These plugin registrations were removed in the repaired Tauri 1 application. Do not reintroduce Tauri 2 plugin examples into this Tauri 1 project. |
-| An executable exits immediately without a window | Check `src/main.rs`. It must initialize and run `tauri::Builder`; replacing it with an empty `fn main()` removes the GUI. |
-| Undefined `DEFAULT_*`, `TauriAPI`, or `tauri` in JavaScript | Frontend defaults come from the `get_defaults` Rust command. Frontend/backend calls use Tauri 1's injected `window.__TAURI_INVOKE__`. Rust constants are not automatically JavaScript globals. |
+| Missing dlltool / import-library error | Select the MSVC toolchain explicitly. |
+| EXE access denied during copy/build | Close that copy after coordinating its owned server; distinguish filesystem sandbox restrictions from source errors. |
+| Tauri dependency features disagree with allowlist | Preserve Tauri 1 configuration and security policy. Do not restore broad api-all/plugin features blindly. |
+| Old frontend / missing index.html | Run npm build from tauri-app; Vite's root is src/frontend and its output is tauri-app/dist. |
+| Lockfile needs updating | Regenerate through Cargo only for an intentional dependency change; repeat verification afterward. |
+| Save or recovery error | Launch → Saved data & recovery; retain data and protected originals rather than deleting them to make launch succeed. |
 
-## Rules for future changes
-
-- Keep the real Tauri entry point, shared process state protected by a mutex, and serializable command results. A `Child` process belongs in Rust state, not in a frontend response.
-- Launch the selected executable directly with `Command` arguments; do not concatenate a shell command or use `cmd` as the launcher.
-- Run `npm run build` after frontend edits and before the Rust release build. Plain `cargo build` does not run the frontend build automatically.
-- Do not edit `dist`, `target`, `node_modules`, or deprecated Python code by hand. Follow `AGENTS.md` restrictions on configuration changes.
-- Use the existing source and valid icon. Do not replace broken functionality with placeholders to make compilation appear successful.
-- This procedure does not require `cargo tauri` or installation of the latest Tauri CLI. The application remains on Tauri 1.
-
-## Verified baseline
-
-The MSVC release build and frontend build succeeded. Catalog tests cover every installed help entry and its impact guidance. Backend tests cover model discovery, argument passing, validation, configuration serialization, and process stopping. A headless browser harness (`tauri-app/tests/gui-smoke.mjs`, requiring Playwright) checks dropdown population, fixed navigation, always-visible Stop, option editing, search, persistence, start/stop states, logs and responsive layout. Its backend responses are mocked; Rust tests separately exercise the native backend logic.
-
-The repository now includes compact grouped rows, a persistent light/dark toggle, and an MCP panel. Native MCP tests cover HTTP/SSE session negotiation and tool pagination, stdio discovery, protected profile round trips, and router launch arguments. The native window and file picker were checked in the initial build. Desktop UI automation was interrupted during the redesign, so do not describe the redesigned interface as fully tested by native UI interaction. Actual model inference has not been verified. A valid icon, desktop executable, and desktop shortcut are present. Keep these verification limits distinct from successful compilation.
+The app remains Tauri 1. Manual EXE builds do not require the Tauri CLI; AppImage packaging requires a compatible 1.x CLI. Do not edit protected tauri.conf.json, generated dist/target/node_modules, or deprecated code.

@@ -44,17 +44,23 @@ pub fn read(path: &Path) -> Result<Library, String> {
         Ok(_) => {}
     }
     let library: Library = serde_json::from_slice(&crate::storage::read_private(path, LIMIT)?)
-        .map_err(|_| "Saved profile library is damaged. It has not been overwritten.")?;
+        .map_err(|_| crate::storage::damaged(path, "Saved profile library is damaged"))?;
     if library.version != 1 {
-        return Err("Profile library needs a newer LLamaLauncher version.".into());
+        return Err(crate::storage::damaged(
+            path,
+            "Profile library needs a newer LLamaLauncher version",
+        ));
     }
     if library.profiles.len() > 128 {
-        return Err("Profile library exceeds 128 profiles.".into());
+        return Err(crate::storage::damaged(
+            path,
+            "Profile library exceeds 128 profiles",
+        ));
     }
     if library
         .profiles
         .iter()
-        .any(|profile| profile.config.schema_version > 2)
+        .any(|profile| profile.config.schema_version > 3)
     {
         return Err(
             "A saved profile requires a newer LLamaLauncher version. The library was preserved."
@@ -195,6 +201,7 @@ mod tests {
         restored.delete(&duplicate.id).unwrap();
         write(&path, &restored).unwrap();
         assert_eq!(read(&path).unwrap().profiles.len(), 1);
+        std::fs::remove_file(path.with_extension("bin.bak")).unwrap();
         std::fs::remove_file(path).unwrap();
         std::fs::remove_dir(folder).unwrap();
     }
@@ -236,6 +243,7 @@ mod tests {
         };
         write(&path, &library).unwrap();
         assert!(read(&path).is_err());
+        std::fs::remove_file(path.with_extension("bin.bak")).unwrap();
         std::fs::remove_file(path).unwrap();
         std::fs::remove_dir(folder).unwrap();
     }

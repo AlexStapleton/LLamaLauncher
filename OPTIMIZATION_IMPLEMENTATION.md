@@ -1,5 +1,7 @@
 # Optimization implementation and verification
 
+**Historical report (October 13).** This records the first optimization pass; counts, schema versions, language coverage and measurements below describe that earlier revision. The [current readiness review](PRODUCTION_READINESS_REVIEW.md), [README](README.md) and [changelog](CHANGELOG.md) supersede its current-state guidance.
+
 October 13, 2026. Work is in the local LLamaLauncher checkout. No publication or remote workflow execution is implied by this report.
 
 ## Changes corresponding to the review

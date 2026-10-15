@@ -9,11 +9,20 @@ use std::{
 #[cfg(test)]
 use std::{process::Child, sync::Mutex};
 use tauri::{Manager, State};
+mod downloads;
+mod features;
 mod framing;
+mod gguf;
+mod hub;
+mod jobs;
+mod logging;
 mod mcp;
+mod monitor;
 mod process_tree;
 mod profiles;
+mod registry;
 mod server;
+mod session;
 mod storage;
 
 mod catalog;
@@ -21,11 +30,32 @@ mod catalog;
 use catalog::scan_models;
 use catalog::{scan_models_cancel, ModelInfo, SCAN_GENERATION};
 mod config;
+mod credentials;
 #[cfg(test)]
 use config::ArgumentOverride;
 use config::Config;
 
 type AppState = server::State;
+#[derive(Default)]
+pub struct CloseGuard {
+    allow: std::sync::atomic::AtomicBool,
+    ready: std::sync::atomic::AtomicBool,
+}
+
+pub(crate) fn configure_runtime_environment(command: &mut Command) {
+    // AppImage's GUI libraries must not shadow a separately installed runtime.
+    if std::env::var_os("APPIMAGE").is_some() {
+        if let Some(directory) = Path::new(command.get_program())
+            .parent()
+            .map(Path::to_path_buf)
+        {
+            command.env("LD_LIBRARY_PATH", directory);
+        } else {
+            command.env_remove("LD_LIBRARY_PATH");
+        }
+        command.env_remove("LD_PRELOAD");
+    }
+}
 
 fn checked_path(value: &str) -> Result<PathBuf, String> {
     if value.trim().is_empty() {
@@ -41,6 +71,16 @@ fn checked_path(value: &str) -> Result<PathBuf, String> {
     fs::canonicalize(path).map_err(|e| format!("Cannot access {}: {}", value, e))
 }
 fn validate(config: &Config) -> Result<(PathBuf, Option<PathBuf>, Vec<IpAddr>), String> {
+    registry::resolve(&config.runtime_id, "runtime", &config.llama_cpp_path)?;
+    if !config.router_mode && !config.model_id.is_empty() {
+        let path = Path::new(&config.model_file);
+        let path = if path.is_absolute() {
+            path.to_owned()
+        } else {
+            Path::new(&config.models_path).join(path)
+        };
+        registry::resolve(&config.model_id, "model", &path.to_string_lossy())?;
+    }
     if config.mcp_profile.enabled {
         validate_mcp_profile(&config.mcp_profile)?;
         if !config.router_mode {
@@ -149,7 +189,7 @@ fn validate(config: &Config) -> Result<(PathBuf, Option<PathBuf>, Vec<IpAddr>), 
 }
 
 fn validate_arguments(config: &Config) -> Result<(), String> {
-    if config.schema_version > 2 {
+    if config.schema_version > 3 {
         return Err("Configuration requires a newer LLamaLauncher version.".into());
     }
     for option in &config.argument_overrides {
@@ -157,38 +197,18 @@ fn validate_arguments(config: &Config) -> Result<(), String> {
             || !option
                 .flag
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
             || option.flag.chars().any(|c| c.is_whitespace() || c == '\0')
         {
             return Err("Invalid argument flag.".into());
         }
         if matches!(option.flag.as_str(), "--model" | "-m" | "--host" | "--port") {
-            return Err("Set model, host, and port in Setup instead of overriding them.".into());
+            return Err("Choose the model in Models; set the listen address and port in Launch instead of overriding them.".into());
         }
         if option.values.iter().any(|v| v.contains('\0')) {
             return Err("Argument values cannot contain null characters.".into());
         }
-        let value = option.values.first().map(String::as_str).unwrap_or("");
-        let numeric = match option.flag.as_str() {
-            "--ctx-size" => Some((0.0, 1048576.0)),
-            "--batch-size" | "--ubatch-size" => Some((1.0, 1048576.0)),
-            "--threads" | "--threads-batch" | "--threads-http" => Some((-1.0, 4096.0)),
-            "--parallel" => Some((-1.0, 4096.0)),
-            "--temp" | "--temperature" => Some((0.0, 100.0)),
-            "--top-p" | "--min-p" | "--typical" | "--typical-p" => Some((0.0, 1.0)),
-            _ => None,
-        };
-        if let Some((min, max)) = numeric {
-            let number: f64 = value
-                .parse()
-                .map_err(|_| format!("{} requires a number.", option.flag))?;
-            if !number.is_finite() || number < min || number > max {
-                return Err(format!(
-                    "{} must be between {} and {}.",
-                    option.flag, min, max
-                ));
-            }
-        }
+        validate_numeric(&option.flag, option.values.first().map(String::as_str))?;
     }
     if config.additional_args.iter().any(|v| v.contains('\0')) {
         return Err("Additional arguments cannot contain null characters.".into());
@@ -199,7 +219,109 @@ fn validate_arguments(config: &Config) -> Result<(), String> {
             "--model" | "-m" | "--host" | "--port"
         )
     }) {
-        return Err("Set model, host, and port in Setup.".into());
+        return Err(
+            "Choose the model in Models; set the listen address and port in Launch.".into(),
+        );
+    }
+    let mut args = config.additional_args.iter();
+    while let Some(arg) = args.next() {
+        let (flag, inline) = arg
+            .split_once('=')
+            .map_or((arg.as_str(), None), |(f, v)| (f, Some(v)));
+        if numeric_rule(flag).is_some() {
+            validate_numeric(flag, inline.or_else(|| args.next().map(String::as_str)))?;
+        }
+        if config.router_mode && remote_model_flag(flag) {
+            return Err(
+                "Router mode must not specify a fixed remote model in custom arguments".into(),
+            );
+        }
+    }
+    Ok(())
+}
+fn remote_model_flag(flag: &str) -> bool {
+    matches!(
+        flag,
+        "--hf-repo" | "-hf" | "-hfr" | "--model-url" | "-mu" | "--docker-repo" | "-dr"
+    ) || flag.ends_with("-default")
+        || flag.ends_with("-spec")
+}
+fn numeric_rule(flag: &str) -> Option<(f64, f64, bool)> {
+    match flag {
+        "--ctx-size" | "-c" => Some((0.0, 1048576.0, true)),
+        "--batch-size" | "-b" | "--ubatch-size" | "-ub" => Some((1.0, 1048576.0, true)),
+        "--threads" | "-t" | "--threads-batch" | "-tb" | "--threads-http" => {
+            Some((-1.0, 4096.0, true))
+        }
+        "--parallel" | "-np" => Some((-1.0, 4096.0, true)),
+        "--n-predict" | "--predict" | "-n" => Some((-2.0, 2147483647.0, true)),
+        "--top-k" => Some((-1.0, 2147483647.0, true)),
+        "--temp" | "--temperature" => Some((0.0, 100.0, false)),
+        "--top-p" | "--min-p" | "--typical" | "--typical-p" => Some((0.0, 1.0, false)),
+        _ => None,
+    }
+}
+fn validate_capabilities(config: &Config, help: &str) -> Result<(), String> {
+    let mut aliases = std::collections::HashMap::<String, String>::new();
+    for line in help
+        .lines()
+        .filter(|line| line.trim_start().starts_with('-'))
+    {
+        let names: Vec<_> = line
+            .split_whitespace()
+            .map(|v| v.trim_matches(','))
+            .filter(|v| {
+                v.starts_with('-')
+                    && v.chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+            })
+            .collect();
+        let canonical = names.iter().find(|n| n.starts_with("--")).copied();
+        if let Some(canonical) = canonical {
+            for name in names {
+                aliases.insert(name.into(), canonical.into());
+            }
+        }
+    }
+    if aliases.is_empty() {
+        return Err("Selected executable did not provide a usable option catalog".into());
+    }
+    let mut requested = Vec::new();
+    for item in &config.argument_overrides {
+        requested.push((item.flag.as_str(), item.values.first().map(String::as_str)));
+    }
+    let mut extra = config.additional_args.iter().peekable();
+    while let Some(arg) = extra.next() {
+        let (flag, inline) = arg
+            .split_once('=')
+            .map_or((arg.as_str(), None), |(f, v)| (f, Some(v)));
+        if flag.starts_with('-') && flag.parse::<f64>().is_err() {
+            requested.push((flag, inline.or_else(|| extra.peek().map(|v| v.as_str()))));
+        }
+    }
+    for (flag, value) in requested {
+        let canonical=aliases.get(flag).ok_or_else(||format!("{flag} is not supported by the selected llama-server; refresh its options or choose a compatible runtime"))?;
+        validate_numeric(canonical, value)?;
+    }
+    if config.router_mode && !config.models_path.is_empty() && !aliases.contains_key("--models-dir")
+    {
+        return Err("Selected runtime does not support router option --models-dir".into());
+    }
+    Ok(())
+}
+fn validate_numeric(flag: &str, value: Option<&str>) -> Result<(), String> {
+    if let Some((min, max, integer)) = numeric_rule(flag) {
+        let number = value
+            .ok_or_else(|| format!("{flag} requires a value"))?
+            .parse::<f64>()
+            .map_err(|_| format!("{flag} requires a number"))?;
+        if !number.is_finite() || number < min || number > max || (integer && number.fract() != 0.0)
+        {
+            return Err(format!(
+                "{flag} requires {} between {min} and {max}",
+                if integer { "an integer" } else { "a number" }
+            ));
+        }
     }
     Ok(())
 }
@@ -319,99 +441,101 @@ fn cancel_models() {
 }
 #[tauri::command]
 async fn server_help(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     binary: String,
     force: Option<bool>,
 ) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let binary = checked_path(&binary)?;
-        type HelpCache = std::sync::Mutex<
-            std::collections::HashMap<(PathBuf, u64, std::time::SystemTime), String>,
-        >;
-        static HELP_CACHE: std::sync::OnceLock<HelpCache> = std::sync::OnceLock::new();
-        let metadata = fs::metadata(&binary).map_err(|e| e.to_string())?;
-        let key = (
-            fs::canonicalize(&binary).map_err(|e| e.to_string())?,
-            metadata.len(),
-            metadata.modified().map_err(|e| e.to_string())?,
-        );
-        let help_cache = HELP_CACHE.get_or_init(Default::default);
-        if !force.unwrap_or(false) {
-            if let Some(cached) = help_cache.lock().map_err(|e| e.to_string())?.get(&key) {
-                return Ok(cached.clone());
-            }
+    tauri::async_runtime::spawn_blocking(move || runtime_help(&binary, force.unwrap_or(false)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+fn runtime_help(binary: &str, force: bool) -> Result<String, String> {
+    let binary = checked_path(binary)?;
+    type HelpCache =
+        std::sync::Mutex<std::collections::HashMap<(PathBuf, u64, std::time::SystemTime), String>>;
+    static HELP_CACHE: std::sync::OnceLock<HelpCache> = std::sync::OnceLock::new();
+    let metadata = fs::metadata(&binary).map_err(|e| e.to_string())?;
+    let key = (
+        fs::canonicalize(&binary).map_err(|e| e.to_string())?,
+        metadata.len(),
+        metadata.modified().map_err(|e| e.to_string())?,
+    );
+    let help_cache = HELP_CACHE.get_or_init(Default::default);
+    if !force {
+        if let Some(cached) = help_cache.lock().map_err(|e| e.to_string())?.get(&key) {
+            return Ok(cached.clone());
         }
-        if !binary.is_file()
-            || (cfg!(windows)
-                && !binary
-                    .extension()
-                    .is_some_and(|e| e.eq_ignore_ascii_case("exe")))
+    }
+    if !binary.is_file()
+        || (cfg!(windows)
+            && !binary
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("exe")))
+    {
+        return Err("Choose llama-server.exe first.".into());
+    }
+    let cache = storage::profile_directory().join("cache");
+    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let output_path = cache.join(format!("help-{}.txt", stamp));
+    let _output_guard = server::Snapshot(output_path.clone());
+    let output = fs::File::create(&output_path).map_err(|e| e.to_string())?;
+    let mut command = Command::new(&binary);
+    command
+        .arg("--help")
+        .current_dir(binary.parent().ok_or("Missing executable folder.")?)
+        .stdout(output.try_clone().map_err(|e| e.to_string())?)
+        .stderr(output)
+        .stdin(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let mut child = server::TemporaryProcess::new(command.spawn().map_err(|e| e.to_string())?)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    let result = loop {
+        if child.try_wait().map_err(|e| e.to_string())?.is_some() {
+            if fs::metadata(&output_path).map_err(|e| e.to_string())?.len() > 1024 * 1024 {
+                break Err("Executable help exceeded 1 MiB.".into());
+            }
+            break fs::read_to_string(&output_path).map_err(|e| e.to_string());
+        }
+        if std::time::Instant::now() >= deadline
+            || fs::metadata(&output_path).is_ok_and(|m| m.len() > 1024 * 1024)
         {
-            return Err("Choose llama-server.exe first.".into());
+            let _ = child.kill();
+            let _ = child.wait();
+            break Err("Reading executable options timed out after 15 seconds.".into());
         }
-        let cache = app
-            .path_resolver()
-            .app_cache_dir()
-            .ok_or("Cannot find application cache.")?;
-        fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| e.to_string())?
-            .as_nanos();
-        let output_path = cache.join(format!("help-{}.txt", stamp));
-        let _output_guard = server::Snapshot(output_path.clone());
-        let output = fs::File::create(&output_path).map_err(|e| e.to_string())?;
-        let mut command = Command::new(&binary);
-        command
-            .arg("--help")
-            .current_dir(binary.parent().ok_or("Missing executable folder.")?)
-            .stdout(output.try_clone().map_err(|e| e.to_string())?)
-            .stderr(output)
-            .stdin(Stdio::null());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    };
+    let _ = fs::remove_file(output_path);
+    if let Ok(text) = &result {
+        let mut cache = help_cache.lock().map_err(|e| e.to_string())?;
+        if cache.len() >= 8 {
+            cache.clear();
         }
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            command.process_group(0);
-        }
-        let mut child = server::TemporaryProcess::new(command.spawn().map_err(|e| e.to_string())?)?;
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
-        let result = loop {
-            if child.try_wait().map_err(|e| e.to_string())?.is_some() {
-                if fs::metadata(&output_path).map_err(|e| e.to_string())?.len() > 1024 * 1024 {
-                    break Err("Executable help exceeded 1 MiB.".into());
-                }
-                break fs::read_to_string(&output_path).map_err(|e| e.to_string());
-            }
-            if std::time::Instant::now() >= deadline
-                || fs::metadata(&output_path).is_ok_and(|m| m.len() > 1024 * 1024)
-            {
-                let _ = child.kill();
-                let _ = child.wait();
-                break Err("Reading executable options timed out after 15 seconds.".into());
-            }
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        };
-        let _ = fs::remove_file(output_path);
-        if let Ok(text) = &result {
-            let mut cache = help_cache.lock().map_err(|e| e.to_string())?;
-            if cache.len() >= 8 {
-                cache.clear();
-            }
-            cache.insert(key, text.clone());
-        }
-        result
-    })
-    .await
-    .map_err(|e| e.to_string())?
+        cache.insert(key, text.clone());
+    }
+    result
 }
 
 #[tauri::command]
-fn command_preview(config: Config) -> Result<Vec<String>, String> {
+async fn command_preview(config: Config) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || preview_inner(config))
+        .await
+        .map_err(|e| e.to_string())?
+}
+fn preview_inner(config: Config) -> Result<Vec<String>, String> {
     validate_arguments(&config)?;
     let model = if config.model_file.is_empty() || uses_alternate_source(&config) {
         None
@@ -423,26 +547,55 @@ fn command_preview(config: Config) -> Result<Vec<String>, String> {
             Path::new(&config.models_path).join(path)
         })
     };
-    let mut args = arguments(&config, model.as_deref());
+    let mut preview = config.clone();
+    for item in &mut preview.argument_overrides {
+        if secret_flag(&item.flag) {
+            item.values.fill("[redacted]".into());
+        }
+    }
+    redact_arguments(&mut preview.additional_args);
+    let mut args = arguments(&preview, model.as_deref());
     if config.mcp_profile.enabled {
         args.extend([
             "--mcp-servers-json".into(),
             "[MCP configuration; credentials protected]".into(),
         ]);
     }
-    let mut secret = false;
+    args.insert(0, config.llama_cpp_path.clone());
+    let sensitive = credentials::values(&config);
     for arg in &mut args {
-        if secret {
+        *arg = credentials::redact(std::mem::take(arg), &sensitive);
+    }
+    Ok(args)
+}
+
+fn secret_flag(flag: &str) -> bool {
+    credentials::secret_flag(flag)
+}
+
+fn redact_arguments(args: &mut [String]) {
+    let mut secret = false;
+    let mut required = false;
+    for arg in args {
+        if required {
             *arg = "[redacted]".into();
-            secret = false;
-        } else if matches!(arg.as_str(), "--api-key" | "--hf-token" | "-hft") {
-            secret = true;
-        } else if arg.starts_with("--api-key=") || arg.starts_with("--hf-token=") {
-            *arg = format!("{}=[redacted]", arg.split('=').next().unwrap_or("--key"));
+            required = false;
+            continue;
+        }
+        if let Some((flag, _)) = arg.split_once('=') {
+            if secret_flag(flag) {
+                *arg = format!("{flag}=[redacted]");
+                secret = false;
+                continue;
+            }
+        }
+        if arg.starts_with('-') {
+            secret = secret_flag(arg);
+            required = secret;
+        } else if secret {
+            *arg = "[redacted]".into();
         }
     }
-    args.insert(0, config.llama_cpp_path.clone());
-    Ok(args)
 }
 
 #[tauri::command]
@@ -452,35 +605,61 @@ async fn server_logs(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| e.to_string())?
 }
 fn read_server_logs(app: tauri::AppHandle) -> Result<String, String> {
-    use std::io::{Read, Seek, SeekFrom};
-    let directory = app
-        .path_resolver()
-        .app_log_dir()
-        .ok_or("Cannot find log folder.")?;
+    let config = app
+        .state::<AppState>()
+        .0
+        .lock()
+        .ok()
+        .and_then(|m| m.instance.as_ref().map(|i| i.config.clone()));
+    let secrets = config.as_ref().map(credentials::values).unwrap_or_default();
+    let directory = storage::profile_directory().join("logs");
     let mut result = format!("Log folder: {}\n", directory.display());
     for name in ["server-stderr.log", "server-stdout.log"] {
-        result.push_str(&format!("\n--- {} ---\n", name));
-        if let Ok(mut file) = fs::File::open(directory.join(name)) {
-            let length = file.metadata().map_err(|e| e.to_string())?.len();
-            file.seek(SeekFrom::Start(length.saturating_sub(32768)))
-                .map_err(|e| e.to_string())?;
-            let mut bytes = Vec::new();
-            file.take(32768)
-                .read_to_end(&mut bytes)
-                .map_err(|e| e.to_string())?;
-            result.push_str(&String::from_utf8_lossy(&bytes));
+        result.push_str(&format!("\n--- {name} ---\n"));
+        if let Ok(text) = logging::tail(&directory.join(name), 32768) {
+            result.push_str(&credentials::redact(text, &secrets));
         }
     }
     Ok(result)
 }
 #[tauri::command]
-fn get_defaults() -> Config {
-    let mut config = Config::default();
-    if let Some(profile) = mcp::load_profile() {
-        config.router_mode = profile.enabled;
-        config.mcp_profile = profile;
-    }
-    config
+async fn get_defaults(app: tauri::AppHandle) -> Result<Config, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut config = Config::default();
+        let models = storage::profile_directory().join("models");
+        fs::create_dir_all(&models).map_err(|_| "Cannot create the portable models folder")?;
+        config.models_path = models.to_string_lossy().into();
+        let mut candidates = Vec::new();
+        if let Ok(executable) = std::env::current_exe() {
+            if let Some(parent) = executable.parent() {
+                candidates.push(parent.join("runtime"));
+            }
+        }
+        if let Some(resources) = app.path_resolver().resource_dir() {
+            candidates.push(resources.join("artifacts/portable/runtime"));
+        }
+        for directory in candidates {
+            let binary = directory.join(if cfg!(windows) {
+                "llama-server.exe"
+            } else {
+                "llama-server"
+            });
+            if binary.is_file() {
+                config.llama_cpp_path = binary.to_string_lossy().trim_start_matches(r"\\?\").into();
+                if let Ok(artifact) = registry::import(&binary, false, None) {
+                    config.runtime_id = artifact.id;
+                }
+                break;
+            }
+        }
+        if let Some(profile) = mcp::load_profile() {
+            config.router_mode = profile.enabled;
+            config.mcp_profile = profile;
+        }
+        Ok(config)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 #[derive(Serialize)]
 struct PlatformInfo {
@@ -771,6 +950,7 @@ async fn browse_path(kind: String, directory: Option<String>) -> Result<Option<S
 #[tauri::command]
 async fn save_config(config: Config) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let config = export_config(config);
         let path = tauri::api::dialog::blocking::FileDialogBuilder::new()
             .set_title("Save configuration")
             .add_filter("JSON", &["json"])
@@ -787,6 +967,9 @@ async fn save_config(config: Config) -> Result<Option<String>, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+fn export_config(config: Config) -> Config {
+    credentials::share(config)
 }
 #[tauri::command]
 async fn load_config() -> Result<Option<Config>, String> {
@@ -825,7 +1008,7 @@ fn decode_config(content: &[u8]) -> Result<Config, String> {
         .get("schema_version")
         .and_then(|v| v.as_u64())
         .unwrap_or(1)
-        > 2
+        > 3
     {
         return Err("Configuration requires a newer LLamaLauncher version.".into());
     }
@@ -862,7 +1045,7 @@ fn decode_config(content: &[u8]) -> Result<Config, String> {
         }
         object.insert("argument_overrides".into(), serde_json::json!(overrides));
     }
-    object.insert("schema_version".into(), serde_json::json!(2));
+    object.insert("schema_version".into(), serde_json::json!(3));
     serde_json::from_value(value).map_err(|e| format!("Invalid configuration: {e}"))
 }
 #[tauri::command]
@@ -877,12 +1060,22 @@ async fn start_server(
         .map_err(|e| e.to_string())?
 }
 fn start_server_inner(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     state: &AppState,
     config: Config,
 ) -> Result<String, String> {
     let (binary, model, hosts) = validate(&config)?;
+    validate_capabilities(&config, &runtime_help(&config.llama_cpp_path, false)?)?;
+    let isolated = state
+        .0
+        .lock()
+        .map_err(|_| "Server state unavailable")?
+        .isolated;
+    let (api_token, api_prefix) = session::authenticate(&config, isolated)?;
     let mut manager = state.0.lock().map_err(|e| e.to_string())?;
+    if manager.benchmark {
+        return Err("Wait for the benchmark to finish or cancel it first.".into());
+    }
     if let Some(instance) = manager.instance.as_mut() {
         if instance
             .child
@@ -900,20 +1093,37 @@ fn start_server_inner(
                 .map_err(|e| format!("Cannot use {}:{}: {}", host, config.port, e))?,
         );
     }
-    let log_dir = app
-        .path_resolver()
-        .app_log_dir()
-        .ok_or("Cannot locate the application log folder.")?;
+    let log_dir = storage::profile_directory().join("logs");
     fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
-    let stdout = fs::File::create(log_dir.join("server-stdout.log")).map_err(|e| e.to_string())?;
-    let stderr = fs::File::create(log_dir.join("server-stderr.log")).map_err(|e| e.to_string())?;
+    let stdout = logging::Writer::open(&log_dir.join("server-stdout.log"), logging::STREAM_LIMIT)
+        .map_err(|e| e.to_string())?;
+    let stderr = logging::Writer::open(&log_dir.join("server-stderr.log"), logging::STREAM_LIMIT)
+        .map_err(|e| e.to_string())?;
     let mut command = Command::new(&binary);
+    configure_runtime_environment(&mut command);
+    for key in [
+        "LLAMA_ARG_HOST",
+        "LLAMA_ARG_PORT",
+        "LLAMA_ARG_MODEL",
+        "LLAMA_ARG_HF_REPO",
+        "LLAMA_ARG_MODEL_URL",
+        "LLAMA_ARG_DOCKER_REPO",
+        "LLAMA_ARG_MCP_SERVERS_JSON",
+        "LLAMA_ARG_MCP_SERVERS_CONFIG",
+    ] {
+        command.env_remove(key);
+    }
+    if manager.isolated {
+        for (key, _) in std::env::vars_os() {
+            let name = key.to_string_lossy();
+            if name.starts_with("LLAMA_") || name.starts_with("MCP_") || name == "HF_TOKEN" {
+                command.env_remove(key);
+            }
+        }
+    }
     command.args(arguments(&config, model.as_deref()));
     let snapshot = if config.mcp_profile.enabled {
-        let cache = app
-            .path_resolver()
-            .app_cache_dir()
-            .ok_or("Cannot find MCP bridge cache.")?;
+        let cache = storage::profile_directory().join("cache");
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| e.to_string())?
@@ -936,8 +1146,8 @@ fn start_server_inner(
                 .ok_or("Cannot locate executable directory.")?,
         )
         .stdin(Stdio::null())
-        .stdout(Stdio::from(stdout))
-        .stderr(Stdio::from(stderr));
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -952,12 +1162,26 @@ fn start_server_inner(
         .spawn()
         .map_err(|e| format!("Cannot start llama-server: {}", e))?;
     let pid = child.id();
-    let tree = match process_tree::ProcessTree::attach(&child) {
+    let mut tree = match process_tree::ProcessTree::attach(&child) {
         Ok(tree) => tree,
         Err(error) => {
             let _ = child.kill();
             let _ = child.wait();
             return Err(error);
+        }
+    };
+    let relays = match logging::Relays::start(
+        child.stdout.take().ok_or("Missing server output pipe")?,
+        child.stderr.take().ok_or("Missing server error pipe")?,
+        stdout,
+        stderr,
+        credentials::values(&config),
+    ) {
+        Ok(relays) => relays,
+        Err(error) => {
+            tree.terminate(&mut child);
+            let _ = child.wait();
+            return Err(format!("Cannot drain server logs: {error}"));
         }
     };
     let health_host = match config.host.split(',').next().unwrap_or("127.0.0.1").trim() {
@@ -972,16 +1196,22 @@ fn start_server_inner(
         health_host.to_string()
     };
     manager.instance = Some(server::Instance {
+        config: config.clone(),
         child,
         tree,
         _snapshot: snapshot,
+        _logs: Some(relays),
+        api_token,
+        api_prefix,
         endpoint: if config.host.ends_with(".sock") {
             format!("unix:{}", config.host)
         } else {
-            let scheme = if config
-                .argument_overrides
-                .iter()
-                .any(|o| o.flag == "--ssl-key-file")
+            let scheme = if (!manager.isolated
+                && std::env::var_os("LLAMA_ARG_SSL_KEY_FILE").is_some())
+                || config
+                    .argument_overrides
+                    .iter()
+                    .any(|o| o.flag == "--ssl-key-file")
                 || config
                     .additional_args
                     .iter()
@@ -1043,7 +1273,70 @@ fn process_status(process: &Mutex<Option<Child>>) -> Result<String, String> {
     }
 }
 fn main() {
+    // Portable Windows releases use a private fixed WebView2 installation.
+    #[cfg(windows)]
+    if let Ok(executable) = std::env::current_exe() {
+        if let Some(directory) = executable.parent() {
+            let webview = directory.join("WebView2");
+            if webview.join("msedgewebview2.exe").is_file() {
+                std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", webview);
+            }
+        }
+    }
     let args: Vec<String> = std::env::args().collect();
+    if matches!(
+        args.get(1).map(String::as_str),
+        Some(
+            "--hardware-report"
+                | "--inspect-model"
+                | "--hub-search"
+                | "--hub-details"
+                | "--runtime-releases"
+        )
+    ) {
+        let result: Result<serde_json::Value, String> = tauri::async_runtime::block_on(async {
+            match args[1].as_str() {
+                "--hardware-report" => {
+                    let mut h = monitor::hardware();
+                    h.gpus = monitor::gpus().await;
+                    if h.gpus.is_empty() {
+                        h.gpus = monitor::adapters().await;
+                    }
+                    serde_json::to_value(h).map_err(|e| e.to_string())
+                }
+                "--inspect-model" => serde_json::to_value(gguf::inspect(
+                    Path::new(args.get(2).ok_or("Supply a GGUF path")?),
+                    4096,
+                    1,
+                )?)
+                .map_err(|e| e.to_string()),
+                "--hub-search" => {
+                    hub::search(
+                        &hub::State::default(),
+                        args.get(2).map(String::as_str).unwrap_or(""),
+                        "",
+                    )
+                    .await
+                }
+                "--hub-details" => {
+                    hub::details(
+                        &hub::State::default(),
+                        args.get(2).ok_or("Supply a repository ID")?,
+                    )
+                    .await
+                }
+                _ => registry::releases().await,
+            }
+        });
+        match result {
+            Ok(v) => println!("{v}"),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     if args.get(1).map(String::as_str) == Some("--benchmark-scan") {
         let started = std::time::Instant::now();
         let result = (|| {
@@ -1102,6 +1395,7 @@ fn main() {
     }
     if args.get(1).map(String::as_str) == Some("--configure-mcp") {
         let result = (|| {
+            let _storage_lock = storage::acquire_lock(&storage::profile_directory())?;
             let json = std::env::var("LLAMA_MCP_PROFILE").map_err(|_| "Missing profile input.")?;
             let profile: mcp::Profile =
                 serde_json::from_str(&json).map_err(|_| "Invalid profile input.")?;
@@ -1110,11 +1404,79 @@ fn main() {
         })(); // Credentials arrive through the environment, never command-line arguments.
         std::process::exit(if result.is_ok() { 0 } else { 1 });
     }
+    let _storage_lock = match storage::acquire_lock(&storage::profile_directory()) {
+        Ok(lock) => lock,
+        Err(error) => {
+            tauri::api::dialog::blocking::message(
+                None::<&tauri::Window>,
+                "Cannot open launcher data",
+                error,
+            );
+            return;
+        }
+    };
+    if let Err(error) = storage::initialize_portable() {
+        tauri::api::dialog::blocking::message(
+            None::<&tauri::Window>,
+            "Cannot initialize portable storage",
+            error,
+        );
+        return;
+    }
+    let mut context = tauri::generate_context!();
+    let windows = context.config().tauri.windows.clone();
+    context.config_mut().tauri.windows.clear();
     tauri::Builder::default()
+        .manage(CloseGuard::default())
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
+                if event
+                    .window()
+                    .state::<CloseGuard>()
+                    .ready
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                    && !event
+                        .window()
+                        .state::<CloseGuard>()
+                        .allow
+                        .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    api.prevent_close();
+                    let _ = event.window().emit("launcher-close-request", ());
+                }
+            }
+        })
         .manage(AppState::default())
         .manage(mcp::Manager::default())
         .manage(profiles::Manager::default())
-        .setup(|app| {
+        .manage(jobs::State::default())
+        .manage(monitor::State::default())
+        .manage(hub::State::load())
+        .manage(downloads::State::load())
+        .setup(move |app| {
+            for window in windows {
+                tauri::WindowBuilder::from_config(app, window)
+                    .data_directory(storage::profile_directory().join("webview"))
+                    .build()?;
+            }
+            session::watch_router(app.handle(), app.state::<AppState>().inner().clone());
+            monitor::start(
+                app.handle(),
+                app.state::<monitor::State>().inner().clone(),
+                app.state::<AppState>().inner().clone(),
+            );
+            let recovery_app = app.handle();
+            let recovery_jobs = app.state::<jobs::State>().inner().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Ok((id, _)) = recovery_jobs.begin("runtime-recovery") {
+                    let result = tauri::async_runtime::spawn_blocking(registry::recover_installs)
+                        .await
+                        .map_err(|_| "Runtime recovery worker failed".to_string())
+                        .and_then(|r| r)
+                        .map(|_| serde_json::json!({"recovered":true}));
+                    recovery_jobs.finish(&recovery_app, &id, result);
+                }
+            });
             let handle = app.handle();
             let state = app.state::<AppState>().inner().clone();
             std::thread::spawn(move || {
@@ -1143,6 +1505,13 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_defaults,
+            features::working_load,
+            features::working_save,
+            features::storage_location,
+            features::storage_issues,
+            features::storage_recover,
+            features::finish_close,
+            features::close_ready,
             platform_info,
             profiles_list,
             profiles_load,
@@ -1163,12 +1532,66 @@ fn main() {
             mcp_connect,
             mcp_test,
             mcp_disconnect,
-            mcp_status
+            mcp_status,
+            features::monitoring_get,
+            features::monitoring_set,
+            features::monitoring_history,
+            features::hardware_snapshot,
+            features::model_inspect,
+            features::model_inspect_config,
+            features::launch_preflight,
+            features::open_llama_documentation,
+            features::server_models,
+            features::router_model,
+            features::open_server_chat,
+            features::jobs_list,
+            features::job_cancel,
+            features::inference_test,
+            features::hub_account,
+            features::hub_connect,
+            features::hub_test,
+            features::hub_disconnect,
+            features::hub_search,
+            features::hub_details,
+            features::hub_read_card,
+            features::hub_sign_in,
+            features::hub_open_sign_in,
+            features::open_hub_page,
+            features::hub_open_tokens,
+            features::download_start,
+            features::downloads_list,
+            features::download_resume,
+            features::artifacts_list,
+            features::runtime_import,
+            features::runtime_releases,
+            features::runtime_install,
+            features::runtime_channel_plan,
+            features::runtime_install_channel,
+            features::runtime_remove,
+            features::benchmark_start,
+            features::results_export,
+            features::results_list,
+            features::download_remove
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("Unable to initialize the configurator")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                app.state::<jobs::State>().shutdown();
+                let monitor = app.state::<monitor::State>();
+                if let Ok(mut state) = monitor.inner.lock() {
+                    state.shutdown = true;
+                }
+                monitor.notify.notify_one();
+                let benchmark = app
+                    .state::<AppState>()
+                    .0
+                    .lock()
+                    .ok()
+                    .and_then(|mut m| m.benchmark_server.take());
+                if let Some(benchmark) = benchmark {
+                    let _ = server::stop(&benchmark);
+                }
                 if let Ok(mut manager) = app.state::<AppState>().0.lock() {
                     manager.shutdown = true;
                 }
@@ -1179,17 +1602,116 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn glib_backport_string_iterator_is_sound_in_optimized_builds() {
+        use glib::variant::ToVariant;
+        let value = vec!["first", "middle", "last"].to_variant();
+        let mut iter = value.array_iter_str().unwrap();
+        assert_eq!(iter.next(), Some("first"));
+        assert_eq!(iter.next_back(), Some("last"));
+        assert_eq!(iter.next(), Some("middle"));
+        assert_eq!(iter.next(), None);
+        assert_eq!(value.array_iter_str().unwrap().nth(1), Some("middle"));
+        assert_eq!(value.array_iter_str().unwrap().nth_back(1), Some("middle"));
+        assert_eq!(value.array_iter_str().unwrap().last(), Some("last"));
+    }
+    #[test]
+    fn previews_redact_inline_aliases_and_every_structured_secret_value() {
+        let config = Config {
+            argument_overrides: vec![ArgumentOverride {
+                flag: "--api-key".into(),
+                values: vec!["fixture-first".into(), "fixture-second".into()],
+            }],
+            additional_args: vec!["-hft=fixture-inline".into(), "--threads".into(), "8".into()],
+            ..Config::default()
+        };
+        let preview = preview_inner(config).unwrap().join(" ");
+        assert!(!preview.contains("fixture-"));
+        assert!(preview.contains("-hft=[redacted]"));
+        assert!(preview.contains("--threads 8"));
+        let mut args = vec![
+            "--api-key".into(),
+            "first".into(),
+            "second".into(),
+            "--threads".into(),
+            "8".into(),
+        ];
+        redact_arguments(&mut args);
+        assert_eq!(
+            args,
+            ["--api-key", "[redacted]", "[redacted]", "--threads", "8"]
+        );
+    }
     #[test]
     fn rejects_missing_paths_and_traversal() {
         assert!(validate(&Config::default()).is_err());
         assert!(checked_path("C:/models/../secret.gguf").is_err());
     }
     #[test]
+    fn selected_runtime_aliases_and_custom_values_receive_equal_validation() {
+        let help =
+            "-t, --threads N    CPU threads\n-c, --ctx-size N    Context\n--metrics    Metrics";
+        let mut config = Config {
+            additional_args: vec!["-t=1.5".into()],
+            ..Config::default()
+        };
+        assert!(validate_capabilities(&config, help).is_err());
+        config.additional_args = vec!["-t".into(), "4".into(), "--metrics".into()];
+        assert!(validate_capabilities(&config, help).is_ok());
+        config.additional_args = vec!["--future-option".into()];
+        assert!(validate_capabilities(&config, help).is_err());
+        config.additional_args = vec!["--ctx-size=NaN".into()];
+        assert!(validate_arguments(&config).is_err());
+        config.router_mode = true;
+        config.additional_args = vec!["-hf=owner/model".into()];
+        assert!(validate_arguments(&config).is_err());
+    }
+    #[test]
+    fn dotted_model_preset_flags_are_preserved() {
+        let config = Config {
+            additional_args: vec!["--fim-qwen-1.5b-default".into()],
+            ..Config::default()
+        };
+        assert!(validate_arguments(&config).is_ok());
+        assert!(validate_capabilities(&config, "--fim-qwen-1.5b-default    Qwen preset").is_ok());
+    }
+    #[test]
+    fn json_exports_remove_credentials_without_changing_private_profiles() {
+        let mut config = Config::default();
+        config.mcp_profile.bearer_token = "fixture-token".into();
+        config
+            .mcp_profile
+            .env
+            .insert("SECRET".into(), "fixture-secret".into());
+        config.argument_overrides.push(ArgumentOverride {
+            flag: "--api-key".into(),
+            values: vec!["fixture-key".into()],
+        });
+        config.argument_overrides.push(ArgumentOverride {
+            flag: "--threads".into(),
+            values: vec!["8".into()],
+        });
+        config.additional_args = vec!["--hf-token=fixture-hf".into()];
+        let exported = export_config(config.clone());
+        let text = serde_json::to_string(&exported).unwrap();
+        for secret in [
+            "fixture-token",
+            "fixture-secret",
+            "fixture-key",
+            "fixture-hf",
+        ] {
+            assert!(!text.contains(secret));
+        }
+        assert_eq!(exported.argument_overrides[0].flag, "--threads");
+        assert_eq!(config.mcp_profile.bearer_token, "fixture-token");
+    }
+    #[test]
     fn config_roundtrip_keeps_defaults() {
         let config: Config = serde_json::from_str("{\"port\":9000}").unwrap();
         assert_eq!(config.port, 9000);
         assert_eq!(config.host, "127.0.0.1");
-        assert_eq!(config.schema_version, 2);
+        assert_eq!(config.schema_version, 3);
         let decoded: Config =
             serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
         assert!(decoded.argument_overrides.is_empty());
@@ -1199,7 +1721,7 @@ mod tests {
         let config =
             decode_config(br#"{"n_ctx":8192,"temperature":0.6,"n_gpu_layers":-1,"port":9000}"#)
                 .unwrap();
-        assert_eq!(config.schema_version, 2);
+        assert_eq!(config.schema_version, 3);
         assert_eq!(config.argument_overrides.len(), 3);
         assert_eq!(config.argument_overrides[0].values, vec!["8192"]);
         assert_eq!(config.argument_overrides[2].values, vec!["all"]);

@@ -24,7 +24,15 @@ try{
       window.__TAURI_INVOKE__=async(command)=>{
         if(command==='platform_info')return{windows:true};
         if(command==='profiles_list')return[];
+        if(command==='monitoring_get')return {enabled:true,interval_seconds:2};
+        if(['monitoring_history','artifacts_list','downloads_list','jobs_list','results_list'].includes(command))return [];
+        if(command==='hub_account')return {connected:false};
         if(command==='get_defaults')return{schema_version:2,llama_cpp_path:'',models_path:'',model_file:'',host:'127.0.0.1',port:8080,argument_overrides:[],additional_args:[],router_mode:false,mcp_profile:{name:'fixture',transport:'http',url:'http://localhost:9811/mcp',enabled:false}};
+        if(command==='storage_issues')return [];
+        if(command==='finish_close'||command==='close_ready')return null;
+        if(command==='working_load')return null;
+        if(command==='working_save')return null;
+        if(command==='storage_location')return 'C:\\fixture\\data';
         if(command==='server_help')return help;
         if(command==='command_preview')return[];
         if(command==='server_status')return'stopped';
@@ -39,6 +47,7 @@ try{
     await page.waitForFunction(()=>document.documentElement.dataset.ready==='true');
     const readyMs=performance.now()-before;
     const tab=performance.now();
+    await page.getByRole('button',{name:'Settings',exact:true}).click();
     await page.getByRole('button',{name:'All options',exact:false}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.option-card').length>200);
     const tabMs=performance.now()-tab;
@@ -65,7 +74,7 @@ try{
   }
   const summary={};
   for(const key of Object.keys(runs[0])){const samples=runs.map(run=>run[key]).sort((a,b)=>a-b);summary[key]={median:Number(samples[2].toFixed(2)),max:Number(samples[4].toFixed(2))};}
-  const report={date:'2026-10-13',kind:'headless Chromium, mocked backend; fresh page per run, warm browser; retained JS heap after forced GC',platform:os.platform(),cpu:os.cpus()[0].model,node:process.version,runs,summary};
+  const report={date:new Date().toISOString(),kind:'headless Chromium, mocked backend; fresh page per run, warm browser; retained JS heap after forced GC',platform:os.platform(),cpu:os.cpus()[0].model,node:process.version,runs,summary};
   fs.mkdirSync(path.join(root,'artifacts'),{recursive:true});
   fs.writeFileSync(path.join(root,'artifacts',process.env.LLAMA_BENCH_NAME||'gui-benchmark.json'),JSON.stringify(report,null,2));
   console.log(JSON.stringify(summary));

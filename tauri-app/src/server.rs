@@ -46,20 +46,28 @@ impl Drop for TemporaryProcess {
 }
 
 pub struct Instance {
+    pub config: crate::config::Config,
     pub child: Child,
     pub tree: crate::process_tree::ProcessTree,
     pub _snapshot: Option<Snapshot>,
     pub endpoint: String,
+    pub _logs: Option<crate::logging::Relays>,
+    pub api_token: String,
+    pub api_prefix: String,
 }
 impl Drop for Instance {
     fn drop(&mut self) {
         self.tree.terminate(&mut self.child);
         let _ = self.child.wait();
+        self._logs.take();
     }
 }
 
 #[derive(Default)]
 pub struct Manager {
+    pub benchmark: bool,
+    pub benchmark_server: Option<State>,
+    pub isolated: bool,
     pub instance: Option<Instance>,
     pub phase: String,
     pub generation: u64,
@@ -80,6 +88,9 @@ pub fn stop(state: &State) -> Result<(), String> {
 
 pub fn status(state: &State) -> Result<String, String> {
     let mut manager = state.0.lock().map_err(|e| e.to_string())?;
+    if manager.benchmark {
+        return Ok("benchmarking".into());
+    }
     if let Some(instance) = manager.instance.as_mut() {
         if let Some(exit) = instance.child.try_wait().map_err(|e| e.to_string())? {
             manager.instance.take();
@@ -94,17 +105,11 @@ pub fn status(state: &State) -> Result<String, String> {
 }
 
 pub fn check_readiness(state: &State, client: &reqwest::blocking::Client) {
-    let probe = {
-        let Ok(manager) = state.0.lock() else { return };
-        manager
-            .instance
-            .as_ref()
-            .map(|i| (i.endpoint.clone(), manager.generation))
-    };
-    let Some((endpoint, generation)) = probe else {
+    let Ok(session) = crate::session::current(state) else {
         return;
     };
-    let ready = probe_endpoint(&endpoint, client);
+    let generation = session.generation;
+    let ready = probe_endpoint(&session.endpoint, client, &session.prefix, &session.token);
     let Ok(mut manager) = state.0.lock() else {
         return;
     };
@@ -112,7 +117,12 @@ pub fn check_readiness(state: &State, client: &reqwest::blocking::Client) {
         manager.phase = if ready { "running" } else { "loading" }.into();
     }
 }
-fn probe_endpoint(endpoint: &str, client: &reqwest::blocking::Client) -> bool {
+fn probe_endpoint(
+    endpoint: &str,
+    client: &reqwest::blocking::Client,
+    prefix: &str,
+    token: &str,
+) -> bool {
     #[cfg(unix)]
     if let Some(socket) = endpoint.strip_prefix("unix:") {
         use std::io::Write;
@@ -124,7 +134,7 @@ fn probe_endpoint(endpoint: &str, client: &reqwest::blocking::Client) -> bool {
             return false;
         }
         if stream
-            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .write_all(format!("GET {prefix}/health HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n").as_bytes())
             .is_err()
         {
             return false;
@@ -135,7 +145,8 @@ fn probe_endpoint(endpoint: &str, client: &reqwest::blocking::Client) -> bool {
             && line.split_whitespace().nth(1) == Some("200");
     }
     client
-        .get(format!("{endpoint}/health"))
+        .get(format!("{endpoint}{prefix}/health"))
+        .bearer_auth(token)
         .send()
         .is_ok_and(|r| r.status().is_success())
 }
@@ -178,9 +189,13 @@ mod tests {
             let mut manager = state.0.lock().unwrap();
             manager.phase = "loading".into();
             manager.instance = Some(Instance {
+                config: crate::config::Config::default(),
                 child,
                 tree,
                 _snapshot: Some(Snapshot(snapshot.clone())),
+                _logs: None,
+                api_token: String::new(),
+                api_prefix: String::new(),
                 endpoint,
             });
         }
@@ -228,7 +243,9 @@ mod tests {
         let client = reqwest::blocking::Client::new();
         assert!(probe_endpoint(
             &format!("unix:{}", socket.display()),
-            &client
+            &client,
+            "",
+            ""
         ));
         worker.join().unwrap();
         std::fs::remove_file(socket).unwrap();

@@ -17,6 +17,25 @@ impl ProcessTree {
                 std::thread::sleep(std::time::Duration::from_millis(25));
             }
         }
+        #[cfg(windows)]
+        {
+            #[link(name = "kernel32")]
+            extern "system" {
+                fn TerminateJobObject(job: isize, code: u32) -> i32;
+            }
+            unsafe {
+                TerminateJobObject(self.0, 1);
+            }
+        }
+        #[cfg(unix)]
+        {
+            extern "C" {
+                fn kill(pid: i32, signal: i32) -> i32;
+            }
+            unsafe {
+                kill(-self.0, 9);
+            }
+        }
         let _ = child.kill();
         // Drop still enforces worker-tree cleanup after a graceful root exit.
     }

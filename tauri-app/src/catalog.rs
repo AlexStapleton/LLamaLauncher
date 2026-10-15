@@ -24,6 +24,7 @@ pub fn scan_models_cancel(
     let mut pending = vec![(root.clone(), 0usize)];
     let mut models = Vec::new();
     let mut visited = 0usize;
+    let mut managed_groups = std::collections::HashMap::<std::path::PathBuf, Vec<String>>::new();
     while let Some((folder, depth)) = pending.pop() {
         for entry in fs::read_dir(&folder).map_err(|e| e.to_string())? {
             if generation
@@ -68,11 +69,53 @@ pub fn scan_models_cancel(
                     .extension()
                     .is_some_and(|e| e.eq_ignore_ascii_case("gguf"))
             {
+                if let Ok(relative) = canonical.strip_prefix(&root) {
+                    let parts: Vec<_> = relative.components().collect();
+                    if let Some(start) = parts
+                        .iter()
+                        .position(|p| p.as_os_str() == ".launcher-downloads")
+                    {
+                        if parts.len() > start + 4 {
+                            let mut group = root.clone();
+                            for component in &parts[..start + 4] {
+                                group.push(component);
+                            }
+                            let names = managed_groups.entry(group.clone()).or_insert_with(|| {
+                                let marker = group.join("complete.json");
+                                if !fs::metadata(&marker).is_ok_and(|m| m.len() <= 4 * 1024 * 1024)
+                                {
+                                    return Vec::new();
+                                }
+                                fs::read(marker)
+                                    .ok()
+                                    .and_then(|b| {
+                                        serde_json::from_slice::<crate::downloads::DownloadPlan>(&b)
+                                            .ok()
+                                    })
+                                    .map(|p| p.files.into_iter().map(|f| f.name).collect())
+                                    .unwrap_or_default()
+                            });
+                            let relative = canonical
+                                .strip_prefix(&group)
+                                .map(|p| p.to_string_lossy().replace('\\', "/"))
+                                .unwrap_or_default();
+                            if !names.contains(&relative) {
+                                continue;
+                            }
+                        }
+                    }
+                }
                 let name = path
                     .strip_prefix(&root)
                     .unwrap_or(&path)
                     .to_string_lossy()
                     .into_owned();
+                if path
+                    .file_name()
+                    .is_some_and(|n| n.to_string_lossy().to_ascii_lowercase().contains("mmproj"))
+                {
+                    continue;
+                }
                 if let Some((_, suffix)) = name.rsplit_once("-of-") {
                     if suffix.ends_with(".gguf") && !name.contains("-00001-of-") {
                         continue;
@@ -104,6 +147,42 @@ mod tests {
         let models = scan_models(&root).unwrap();
         assert_eq!(models.len(), 2);
         assert_ne!(models[0].path, models[1].path);
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod managed_tests {
+    use super::*;
+    #[test]
+    fn only_completed_manifest_members_are_discovered() {
+        let root = std::env::temp_dir().join(format!("managed-scan-{}", std::process::id()));
+        let group = root
+            .join(".launcher-downloads/owner/repo")
+            .join("a".repeat(40));
+        fs::create_dir_all(&group).unwrap();
+        fs::write(group.join("complete-model.gguf"), b"one").unwrap();
+        fs::write(group.join("incomplete-model.gguf"), b"two").unwrap();
+        assert!(scan_models(&root).unwrap().is_empty());
+        let plan = crate::downloads::DownloadPlan {
+            id: "fixture".into(),
+            repo: "owner/repo".into(),
+            revision: "a".repeat(40),
+            root: root.to_string_lossy().into(),
+            files: vec![crate::downloads::DownloadFile {
+                name: "complete-model.gguf".into(),
+                size: 3,
+                sha256: String::new(),
+            }],
+        };
+        fs::write(
+            group.join("complete.json"),
+            serde_json::to_vec(&plan).unwrap(),
+        )
+        .unwrap();
+        let models = scan_models(&root).unwrap();
+        assert_eq!(models.len(), 1);
+        assert!(models[0].name.contains("complete-model"));
         fs::remove_dir_all(root).unwrap();
     }
 }

@@ -10,6 +10,8 @@ pub struct ArgumentOverride {
 #[serde(default)]
 pub struct Config {
     pub schema_version: u32,
+    pub runtime_id: String,
+    pub model_id: String,
     pub llama_cpp_path: String,
     pub models_path: String,
     pub model_file: String,
@@ -23,7 +25,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            schema_version: 2,
+            schema_version: 3,
+            runtime_id: String::new(),
+            model_id: String::new(),
             llama_cpp_path: String::new(),
             models_path: String::new(),
             model_file: String::new(),

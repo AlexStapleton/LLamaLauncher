@@ -1,5 +1,7 @@
 # LLamaLauncher architecture and optimization review
 
+**Historical source review.** The [current readiness review](PRODUCTION_READINESS_REVIEW.md) and [changelog](CHANGELOG.md) describe the subsequent implementation. Source line numbers and JavaScript paths below refer to the original revision.
+
 Reviewed October 13, 2026. This is a source review, not a performance benchmark. No application behavior was changed for this review. Windows builds and earlier integration checks are useful baseline evidence; Linux runtime behavior remains unverified.
 
 The subsequent [implementation report](OPTIMIZATION_IMPLEMENTATION.md) records the applied fixes, benchmarks and remaining verification gaps. Findings below describe the pre-optimization source.

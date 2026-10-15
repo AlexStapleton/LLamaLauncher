@@ -424,6 +424,16 @@ impl Client {
             if catalog_bytes > crate::framing::CATALOG_LIMIT {
                 return Err("MCP tool catalog exceeded 16 MiB.".into());
             }
+            for tool in page {
+                if !tool["name"]
+                    .as_str()
+                    .is_some_and(|name| !name.is_empty() && name.len() <= 256)
+                    || !tool["inputSchema"].is_object()
+                    || tool.get("description").is_some_and(|d| !d.is_string())
+                {
+                    return Err("MCP server supplied an invalid tool definition".into());
+                }
+            }
             tools.extend(page.iter().cloned());
             if tools.len() > 10000 {
                 return Err("MCP server returned more than 10,000 tools.".into());
@@ -496,7 +506,17 @@ pub fn server_config(profile: &Profile, bridge_snapshot: &Path) -> Result<String
     } else {
         (profile.command.clone(), profile.args.clone())
     };
-    let mut entry = json!({"command":command,"args":args,"env":profile.env,"timeout_ms":30000});
+    let mut environment = profile.env.clone();
+    if profile.transport == "http" && std::env::var_os("APPIMAGE").is_some() {
+        // The bridge is the GUI executable in CLI mode and needs the AppImage's
+        // own libraries, while llama-server uses its separate runtime directory.
+        for key in ["LD_LIBRARY_PATH", "LD_PRELOAD"] {
+            if let Ok(value) = std::env::var(key) {
+                environment.insert(key.into(), value);
+            }
+        }
+    }
+    let mut entry = json!({"command":command,"args":args,"env":environment,"timeout_ms":30000});
     if !profile.cwd.is_empty() {
         entry["cwd"] = json!(profile.cwd);
     }
