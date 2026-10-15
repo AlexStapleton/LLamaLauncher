@@ -26,6 +26,8 @@ When upgrading, keep an account-protected backup of the existing `data` director
 
 The release pipeline must pass Windows/Linux frontend builds, type/interface checks, Rust formatting/lints/release tests, browser regressions and a native Linux GUI window check before publishing. Windows packaging also tests fresh startup with its bundled WebView2. MCP checks list tools without executing them.
 
+The hosted Windows smoke check uses Windows UI Automation to verify the real window's ready status and Start button, confirms its browser process uses the packaged runtime, and checks private settings are saved beside the EXE. Local CDP tests additionally exercise native IPC and expanded help. The CI check does not depend on exposing a browser debugging port.
+
 This is an **unsigned beta release**. Clean-machine deployment, the wider GPU/driver matrix, registered browser OAuth and extended stress/soak testing remain acceptance gates. Native CI and local checks do not establish that those broader scenarios passed. General startup/search benchmark timings were essentially unchanged by the focused optimization pass; its demonstrated benefit is removing redundant work and edit disruption.
 
 See [README](https://github.com/AlexStapleton/LLamaLauncher/blob/1.1/README.md), [settings guide](https://github.com/AlexStapleton/LLamaLauncher/blob/1.1/LLAMA_SETTINGS_GUIDE.md), [changelog](https://github.com/AlexStapleton/LLamaLauncher/blob/1.1/CHANGELOG.md) and [readiness review](https://github.com/AlexStapleton/LLamaLauncher/blob/1.1/PRODUCTION_READINESS_REVIEW.md).
