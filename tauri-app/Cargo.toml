@@ -27,6 +27,7 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 glib = "0.15.12"
+libc = "0.2"
 
 [[bin]]
 name = "llama-server-configurator"
