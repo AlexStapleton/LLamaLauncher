@@ -323,7 +323,13 @@ try {
   await page.getByRole('button',{name:'Profiles',exact:true}).click();await page.getByRole('button',{name:'Load saved results',exact:true}).click();await page.locator('.benchmark-table').waitFor();assert.match(await page.locator('.benchmark-table').textContent(),/32.00/);
   await page.screenshot({path:path.join(root,'artifacts/gui-benchmark-results.png')});
   assert.equal(await page.locator('.primary-nav > button').count(),6);
-  await page.setViewportSize({width:800,height:600});assert.equal(await page.evaluate(()=>document.body.scrollWidth>window.innerWidth),false);
+  await page.setViewportSize({width:800,height:600});
+  await page.waitForFunction(()=>document.body.scrollWidth<=window.innerWidth,{},{timeout:5000}).catch(async error=>{
+    await page.screenshot({path:path.join(root,'artifacts/gui-responsive-failure.png')});
+    const overflow=await page.evaluate(()=>({width:innerWidth,body:document.body.scrollWidth,elements:[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,15).map(e=>({tag:e.tagName,id:e.id,className:e.className,right:e.getBoundingClientRect().right}))}));
+    throw Error(`Responsive layout did not settle: ${JSON.stringify(overflow)}\n${error.message}`);
+  });
+  assert.equal(await page.evaluate(()=>document.body.scrollWidth>window.innerWidth),false);
   await page.setViewportSize({width:1200,height:760});
   for (const name of ['Setup','Models & downloads','Performance','Profiles','Dashboard']) {
     await openSection(name);await page.locator('.settings-panel').evaluate(p=>p.scrollTop=0);
