@@ -22,7 +22,7 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: /
         shell: bash
-        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev libgpg-error0 libcom-err2 patchelf xvfb xauth x11-utils
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl wget file zstd git build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev libgpg-error0 libcom-err2 patchelf xvfb xauth x11-utils
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -55,19 +55,29 @@ jobs:
           ./release-windows.ps1
       - name: Linux checks and AppImage
         if: runner.os == 'Linux'
+        shell: bash
         env:
           WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: '1'
         run: |
           cargo fmt --check
           cargo clippy --all-targets --locked -- -D warnings
           cargo test --release --locked
-          bash release-linux.sh --skip-clean-host
+          mkdir -p artifacts
+          bash release-linux.sh --skip-clean-host 2>&1 | tee artifacts/linux-package.log
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-packages-${{ runner.os }}
           path: tauri-app/artifacts/release/*
           compression-level: 0
           if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && runner.os == 'Linux'
+        with:
+          name: portable-linux-diagnostics
+          path: |
+            tauri-app/artifacts/linux-package.log
+            tauri-app/artifacts/LINUX_PACKAGE_VERSIONS.txt
+          if-no-files-found: warn
   appimage-compatibility:
     needs: package
     runs-on: ubuntu-24.04

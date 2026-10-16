@@ -63,7 +63,8 @@ Run `tauri-app/desktop-app/llama-server-configurator.exe`. The frontend is embed
 For current source builds, use Debian 13 and install the Tauri 2 system dependencies:
 
 ```sh
-sudo apt-get install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev patchelf
+sudo apt-get update
+sudo apt-get install build-essential pkg-config ca-certificates curl wget file zstd libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev libgpg-error0 libcom-err2 patchelf xvfb xauth x11-utils
 cd tauri-app
 npm ci
 bash build-linux.sh

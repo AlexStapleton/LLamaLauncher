@@ -16,7 +16,7 @@ node tests/verify-glib-backport.mjs
 node tests/linux-package-inventory.mjs
 node tests/appimage-config.mjs
 export APPIMAGE_EXTRACT_AND_RUN=1
-npx --no-install tauri build --config artifacts/portable-config.json --bundles appimage -- --locked
+npx --no-install tauri build --verbose --config artifacts/portable-config.json --bundles appimage -- --locked
 version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).version')
 mapfile -t images < <(find "${CARGO_TARGET_DIR:-target}/release/bundle/appimage" -maxdepth 1 -name '*.AppImage' -type f)
 [[ ${#images[@]} -eq 1 ]] || { echo 'Expected one AppImage output' >&2; exit 1; }
