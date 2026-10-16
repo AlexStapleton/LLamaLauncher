@@ -653,7 +653,7 @@ pub async fn runtime_remove(
 #[tauri::command]
 pub async fn results_list() -> Result<Vec<Value>, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let dir = crate::storage::profile_directory().join("benchmarks");
+        let dir = crate::locations::state().join("benchmarks");
 
         if !dir.exists() {
             return Ok(Vec::new());
@@ -951,7 +951,7 @@ results.push(json!({
             let result=json!({
 "timestamp":monitor::now(),"hardware":hardware,"results":results}
 );
-let path=crate::storage::profile_directory().join("benchmarks").join(format!("{job_id}.bin"));
+let path=crate::locations::state().join("benchmarks").join(format!("{job_id}.bin"));
 let saved=result.clone();
 tauri::async_runtime::spawn_blocking(move||{crate::storage::write_private_atomic(&path,&serde_json::to_vec(&saved).map_err(|e|e.to_string())?)?;retain_benchmarks(path.parent().ok_or("Missing history folder")?,32)}).await.map_err(|e|e.to_string())??;
 Ok(result)}

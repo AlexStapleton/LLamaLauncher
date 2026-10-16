@@ -4,6 +4,7 @@ interface Controls {
   'listen_lan': HTMLButtonElement;
   'network_url': HTMLElement;
   'theme_toggle': HTMLButtonElement;
+  'text_size': HTMLSelectElement;
   'serverStatusIndicator': HTMLElement;
   'start_server': HTMLButtonElement;
   'stop_server': HTMLButtonElement;

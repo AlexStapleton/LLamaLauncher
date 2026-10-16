@@ -37,14 +37,14 @@ For the current fixes and validation, read the [production readiness review](PRO
 
 Current source builds produce **LLamaLauncher-<version>-Windows-x86_64.exe**. Put it in a writable folder and double-click to open the GUI directly. There is no setup wizard, installation registration or automatic shortcut creation. The EXE embeds WebView2, VC DLLs, notices and documentation; runtime files unpack into a unique temporary folder for the session and are cleaned on normal exit. This adds startup extraction time and temporary disk usage. Profiles, settings, engines and default model downloads stay in **data beside the original EXE**. To update, close the app and replace the EXE while keeping `data`; to move it, move both together (same Windows account for protected credentials). Earlier published `-Setup.exe` assets are installers and remain unchanged.
 
-On Linux, download **Linux-x86_64.AppImage**, place it in a writable folder and run:
+On Linux, download **Linux-x86_64.AppImage**, mark it executable and run:
 
 ```sh
 chmod +x LLamaLauncher-1.1.2-Linux-x86_64.AppImage
 ./LLamaLauncher-1.1.2-Linux-x86_64.AppImage
 ```
 
-If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; no host WebKitGTK 4.0 installation is required. Linux x86_64 with glibc 2.39 or newer and a desktop display is required; this is not an ARM or Alpine/musl build. Keep the adjacent `data` folder when replacing the AppImage. The old 1.1 Linux ZIP was a raw binary requiring system WebKitGTK; use the new AppImage instead.
+If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; no host WebKitGTK 4.0 installation is required. Current source/test packages target Linux x86_64 with glibc 2.41 or newer and use XDG storage; the executable's directory need not be writable. Published 1.1.2 retains its earlier glibc 2.39 baseline and adjacent-data behavior. This is not an ARM or Alpine/musl build. The old 1.1 Linux ZIP was a raw binary requiring system WebKitGTK.
 
 ## Build on Windows
 
@@ -127,7 +127,13 @@ The portable launcher includes its GUI dependencies. It does not bundle a duplic
 
 Choose your GGUF in **Models**, then press **Use for single-model launch** to return to Launch. The picker stays visible in router mode. Single-model mode turns off MCP for that launch; router mode loads advertised models on demand. Launch shows the selected model, missing setup requirements and startup failures.
 
-Saved profiles, working settings, accounts, monitoring preferences, downloaded engines, default downloaded models, logs and WebView data live in a **data** folder beside the EXE (or beside the original AppImage on Linux). Copy the whole launcher folder to preserve it. Managed paths inside data are stored relative to it, so moving that folder preserves references. Existing external models and imported executables retain their paths. Windows private records remain bound to the Windows account through DPAPI; Linux files use account-only permissions. First startup copies existing native profile/account records from the old per-user directory without deleting them. Existing externally located runtime/model files are not moved. The test-only `LLAMA_LAUNCHER_DATA_DIR` override isolates integration fixtures.
+Windows keeps profiles, settings, installed engines, default model downloads and logs in **data beside the original EXE**. Keep them together when moving it; Windows private records remain bound to that account through DPAPI.
+
+Linux follows XDG locations: profiles/settings/accounts in `$XDG_CONFIG_HOME/llama-launcher` (default `~/.config/llama-launcher`); engines, registry and browser data in `$XDG_DATA_HOME/llama-launcher` (default `~/.local/share/llama-launcher`); logs, downloads queue and benchmark history in `$XDG_STATE_HOME/llama-launcher` (default `~/.local/state/llama-launcher`); disposable caches in `$XDG_CACHE_HOME/llama-launcher` (default `~/.cache/llama-launcher`). Empty or relative XDG values use the standard home-relative defaults. New model downloads default to **LLamaLauncher/models inside the desktop's configured Downloads folder**, including localized/custom paths from `user-dirs.dirs`; if none is configured, application data is the fallback. Downloads use the folder selected in Models; existing selections are preserved.
+
+The first Linux launch copies bounded old adjacent-data metadata and backups without deleting originals or moving model/runtime files. Saved paths still reference those files. Retained old runtimes become external imports; deleting their library entry preserves their files. Existing XDG records take priority. Old logs/history remain in their original folders. Linux private records use account-only permissions. The explicit `LLAMA_LAUNCHER_DATA_DIR` override keeps isolated fixtures or an intentionally selected portable layout together.
+
+Use **Text size** in the header to choose 90–200%. The preference persists; the interface uses the desktop system font and relative sizes, and navigation/form rows grow with the text. At larger sizes, quick-profile and summary shortcuts yield space to the main controls; the full profile manager remains available in Profiles.
 
 Public Hugging Face searches and downloads need no account. For gated/private repositories, connect a read token in Connections; **Get a read token** opens Hugging Face account settings. Browser sign-in remains under advanced account settings and is disabled until a registered public OAuth client ID is entered. GGUF files appear next to search results; loading an optional model card no longer delays file selection. Action failures appear beside the relevant controls.
 

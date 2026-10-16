@@ -24,7 +24,7 @@ The active application is `tauri-app/`: Rust/Tauri 2 with a Vite frontend. Keep 
 - Verify with `npm test`, `cargo test --release --locked`, and the optional Playwright interface harness. Describe headless mocked-backend checks separately from real native/MCP checks.
 - Never commit tokens, private MCP profile files, or live connection fixtures. Windows credentials use DPAPI; Linux profiles use account-only file permissions. Do not claim Linux profiles are encrypted.
 - MCP tests may initialize and list tools. Do not invoke discovered tools merely to verify a connection.
-- Keep GUI rows compact and grouped; descriptions and resource impact belong in expandable help. Light/dark preference persists locally.
+- Keep GUI rows compact and grouped; descriptions and resource impact belong in expandable help. Light/dark and text-size preferences persist locally. Use system fonts, relative type sizes and growing layout rows; verify 100–200% text without clipped controls or horizontal page overflow.
 - Option placement and reviewed explanations are explicit metadata in `option-guide.js`, not flag-name keyword guesses. Keep GPU weight layers distinct from KV cache. Document direction and conditional magnitude without invented throughput promises; retain executable syntax/defaults and label unknown flags unreviewed. Regenerate `LLAMA_SETTINGS_GUIDE.md` with `node tests/generate-settings-guide.mjs` and verify `--check` after edits.
 - Router mode must omit a fixed `--model`, use the selected models directory or cache, and stop owned worker/bridge processes with the router.
 
@@ -43,7 +43,8 @@ Publishing commits or pull requests must follow the user's authorization. The in
 
 ## Portable storage and runtime channels
 
-- All managed state is in data beside the executable; AppImage uses the original image's directory, not its temporary mount. LLAMA_LAUNCHER_DATA_DIR is an explicit test override.
+- Windows keeps managed state in data beside the original portable executable. Linux follows XDG config/data/state/cache locations and GLib's configured Downloads directory for new default GGUF downloads; it must not create data beside an AppImage. `locations.rs` is the shared path policy. LLAMA_LAUNCHER_DATA_DIR is an explicit isolated-fixture/portable override.
+- Linux migration copies bounded metadata/backups without deleting originals or moving large model/runtime files. Decode old relative references against their original root before saving them. Retained old runtimes become external imports, so removal cannot delete them. Existing XDG records and explicitly selected model folders take priority. Exercise the isolated XDG migration fixture and clean-host native window check.
 - Preserve private file protection and relative references to managed paths. Copy legacy native records without deleting the originals; never copy developer data into packages.
 - Stable follows the latest official non-prerelease and its published binary tag when needed. Beta follows prereleases. Never silently substitute Beta for Stable. Hardware/backend selection is automatic; only the release channel is a normal user choice.
 - Model folder/picker belongs in Models and stays visible in router mode. Single-model selection disables MCP for the next launch; preserve the connection profile itself.

@@ -26,7 +26,7 @@ pub struct Artifact {
 }
 
 fn path() -> PathBuf {
-    crate::storage::profile_directory().join("artifacts.bin")
+    crate::locations::record("artifacts.bin")
 }
 
 pub fn list() -> Result<Vec<Artifact>, String> {
@@ -113,7 +113,7 @@ pub fn resolve(id: &str, kind: &str, path: &str) -> Result<(), String> {
 }
 
 pub fn runtimes_dir() -> PathBuf {
-    crate::storage::profile_directory().join("runtimes")
+    crate::locations::data().join("runtimes")
 }
 
 pub fn probe(binary: &Path, flag: &str) -> Result<String, String> {
@@ -124,7 +124,7 @@ fn probe_cancel(
     flag: &str,
     cancel: &std::sync::atomic::AtomicBool,
 ) -> Result<String, String> {
-    let cache = crate::storage::profile_directory().join("probes");
+    let cache = crate::locations::probes();
 
     fs::create_dir_all(&cache).map_err(|_| "Cannot create probe directory")?;
 

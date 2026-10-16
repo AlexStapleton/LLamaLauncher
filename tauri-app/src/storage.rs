@@ -7,6 +7,15 @@ use std::{
 type Faults = Mutex<std::collections::BTreeMap<PathBuf, String>>;
 static FAULTS: OnceLock<Faults> = OnceLock::new();
 static WRITES: Mutex<()> = Mutex::new(());
+const RECORDS: [&str; 7] = [
+    "working-settings.bin",
+    "launch-profiles.bin",
+    "mcp-profile.bin",
+    "hugging-face.bin",
+    "monitoring.bin",
+    "downloads.bin",
+    "artifacts.bin",
+];
 pub fn damaged(path: &Path, reason: &str) -> String {
     let message = format!(
         "{}: {reason}. Original preserved; use Storage recovery.",
@@ -18,25 +27,17 @@ pub fn damaged(path: &Path, reason: &str) -> String {
     message
 }
 pub fn issues() -> Vec<serde_json::Value> {
-    for name in [
-        "working-settings.bin",
-        "launch-profiles.bin",
-        "mcp-profile.bin",
-        "hugging-face.bin",
-        "monitoring.bin",
-        "downloads.bin",
-        "artifacts.bin",
-    ] {
-        let path = profile_directory().join(name);
+    let paths = RECORDS.map(crate::locations::record);
+    for (name, path) in RECORDS.into_iter().zip(&paths) {
         if path.exists() {
-            if let Err(error) = read_private(&path, record_limit(&path))
+            if let Err(error) = read_private(path, record_limit(path))
                 .and_then(|bytes| validate_recovery(name, &bytes))
             {
-                damaged(&path, &error);
+                damaged(path, &error);
             }
         }
     }
-    FAULTS.get_or_init(Default::default).lock().map(|f|f.iter().filter(|(p,_)|p.parent()==Some(profile_directory().as_path())).map(|(p,m)|serde_json::json!({"name":p.file_name().unwrap_or_default(),"message":m,"backup":p.with_extension("bin.bak").is_file()})).collect()).unwrap_or_default()
+    FAULTS.get_or_init(Default::default).lock().map(|f|f.iter().filter(|(p,_)|paths.contains(p)).map(|(p,m)|serde_json::json!({"name":p.file_name().unwrap_or_default(),"message":m,"backup":p.with_extension("bin.bak").is_file()})).collect()).unwrap_or_default()
 }
 pub fn load_optional<T: serde::de::DeserializeOwned>(
     path: &Path,
@@ -52,7 +53,11 @@ pub fn load_optional<T: serde::de::DeserializeOwned>(
         .map_err(|_| damaged(path, "Cannot decode saved record"))
 }
 fn legacy_profile_path() -> PathBuf {
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::locations::config().join("mcp-profile.bin")
+    }
+    #[cfg(all(not(windows), not(target_os = "linux")))]
     {
         let base = std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
@@ -99,11 +104,7 @@ pub fn portable_executable() -> Option<PathBuf> {
         .filter(|path| path.is_absolute() && path.is_file())
 }
 fn profile_path() -> PathBuf {
-    let root = std::env::var_os("LLAMA_LAUNCHER_DATA_DIR")
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute())
-        .unwrap_or_else(|| executable_directory().join("data"));
-    root.join("mcp-profile.bin")
+    crate::locations::record("mcp-profile.bin")
 }
 
 /// Hold this handle for the entire GUI lifetime. Atomic writes alone cannot
@@ -126,8 +127,16 @@ pub fn acquire_named_lock(root: &Path, name: &str) -> Result<fs::File, String> {
 
 /// Copy legacy saved records once. Imported executables/models keep their original paths.
 pub fn initialize_portable() -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("LLAMA_LAUNCHER_DATA_DIR")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .is_none()
+    {
+        return initialize_xdg();
+    }
     let root = profile_directory();
-    fs::create_dir_all(&root).map_err(|_|"The launcher folder is not writable. Extract it into a folder you own to save profiles and install llama.cpp.")?;
+    fs::create_dir_all(&root).map_err(|_|"The saved-data folder is not writable. Choose a writable location for the launcher or its data override.")?;
     let marker = root.join("storage-version.txt");
     if marker.exists() {
         return Ok(());
@@ -168,6 +177,104 @@ pub fn initialize_portable() -> Result<(), String> {
 }
 
 const RELATIVE_PREFIX: &str = "llama-launcher-relative:/";
+#[cfg(target_os = "linux")]
+fn initialize_xdg() -> Result<(), String> {
+    use std::os::unix::fs::DirBuilderExt;
+    for directory in [
+        crate::locations::config(),
+        crate::locations::data(),
+        crate::locations::state(),
+        crate::locations::cache(),
+    ] {
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(directory)
+            .map_err(|_| "Cannot create the application's XDG directories")?;
+    }
+    let marker = crate::locations::config().join("xdg-layout-v1");
+    if marker.exists() {
+        return Ok(());
+    }
+    // Copy only bounded metadata. Existing model/runtime files and originals
+    // stay where they are; decoded absolute references continue to find them.
+    for previous in [
+        executable_directory().join("data"),
+        legacy_profile_path()
+            .parent()
+            .ok_or("Invalid legacy location")?
+            .into(),
+    ] {
+        let _previous_lock =
+            if previous != profile_directory() && previous.join("launcher.lock").is_file() {
+                let lock = fs::File::open(previous.join("launcher.lock"))
+                    .map_err(|_| "Cannot read the previous launcher's lock")?;
+                lock.try_lock()
+                    .map_err(|_| "Close the previous launcher before importing its saved data")?;
+                Some(lock)
+            } else {
+                None
+            };
+        for name in RECORDS {
+            let from = previous.join(name);
+            let to = crate::locations::record(name);
+            if from == to || to.exists() || !from.is_file() {
+                continue;
+            }
+            migrate_record(&from, &to, &previous, name)?;
+            let backup = from.with_extension("bin.bak");
+            let target_backup = to.with_extension("bin.bak");
+            if backup.is_file() && !target_backup.exists() {
+                migrate_record(&backup, &target_backup, &previous, name)?;
+            }
+        }
+    }
+    atomic_bytes(&marker, b"xdg-v1\n")
+}
+
+#[cfg(target_os = "linux")]
+fn migrate_record(from: &Path, to: &Path, previous: &Path, name: &str) -> Result<(), String> {
+    let limit = record_limit(Path::new(name));
+    match read_private_at(from, limit, previous)
+        .and_then(|bytes| validate_recovery(name, &bytes).map(|_| bytes))
+    {
+        Ok(mut bytes) => {
+            if name == "artifacts.bin" {
+                let mut artifacts: Vec<crate::registry::Artifact> = serde_json::from_slice(&bytes)
+                    .map_err(|_| "Cannot import the previous artifact registry")?;
+                for artifact in &mut artifacts {
+                    if artifact.kind == "runtime"
+                        && !Path::new(&artifact.path).starts_with(crate::registry::runtimes_dir())
+                    {
+                        // Retained old installations are now external imports:
+                        // removal can forget their record, never their files.
+                        artifact.managed = false;
+                    }
+                }
+                bytes = serde_json::to_vec(&artifacts)
+                    .map_err(|_| "Cannot encode the imported artifact registry")?;
+            }
+            write_private_atomic(to, &bytes)
+        }
+        Err(_) => {
+            use std::io::Read;
+            let mut original = Vec::new();
+            fs::File::open(from)
+                .and_then(|file| file.take(limit as u64 + 66049).read_to_end(&mut original))
+                .map_err(|_| "Cannot preserve a previous saved record; original retained")?;
+            if original.len() > limit + 66048 {
+                return Err("Previous saved record exceeds its limit; original retained".into());
+            }
+            atomic_bytes(to, &original)?;
+            damaged(
+                to,
+                "Previous record could not be decoded; original retained",
+            );
+            Ok(())
+        }
+    }
+}
+
 fn translate_paths(value: &mut serde_json::Value, root: &Path, encode: bool) {
     match value {
         serde_json::Value::String(text) => {
@@ -207,10 +314,13 @@ fn translate_paths(value: &mut serde_json::Value, root: &Path, encode: bool) {
 }
 
 fn portable_bytes(bytes: &[u8], encode: bool) -> Vec<u8> {
+    portable_bytes_at(bytes, &crate::locations::data(), encode)
+}
+fn portable_bytes_at(bytes: &[u8], root: &Path, encode: bool) -> Vec<u8> {
     let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
         return bytes.to_vec();
     };
-    translate_paths(&mut value, &profile_directory(), encode);
+    translate_paths(&mut value, root, encode);
     serde_json::to_vec(&value).unwrap_or_else(|_| bytes.to_vec())
 }
 #[cfg(windows)]
@@ -482,6 +592,9 @@ pub fn read_private(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
     result
 }
 fn read_private_inner(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
+    read_private_at(path, limit, &crate::locations::data())
+}
+fn read_private_at(path: &Path, limit: usize, root: &Path) -> Result<Vec<u8>, String> {
     use std::io::Read;
     let mut bytes = Vec::new();
     fs::File::open(path)
@@ -502,7 +615,7 @@ fn read_private_inner(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
                 .map_err(|_| "Cannot decode saved record")?;
         }
     }
-    let plain = portable_bytes(&plain, false);
+    let plain = portable_bytes_at(&plain, root, false);
     if plain.len() > limit {
         return Err("Profile library exceeded its size limit.".into());
     }
@@ -566,7 +679,7 @@ fn validate_recovery(name: &str, bytes: &[u8]) -> Result<(), String> {
 }
 /// Explicit recovery archives the original protected bytes before changing state.
 pub fn recover(name: &str, action: &str) -> Result<(), String> {
-    recover_record(&profile_directory().join(name), name, action)
+    recover_record(&crate::locations::record(name), name, action)
 }
 fn recover_record(path: &Path, name: &str, action: &str) -> Result<(), String> {
     if ![
@@ -773,5 +886,197 @@ mod portable_tests {
         let mut escape = serde_json::json!(format!("{RELATIVE_PREFIX}../escape"));
         translate_paths(&mut escape, &new, false);
         assert!(escape.as_str().unwrap().starts_with(RELATIVE_PREFIX));
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod xdg_tests {
+    use super::*;
+    #[test]
+    #[ignore = "Isolated XDG fixture launched by migration test"]
+    fn layout_fixture() {
+        use std::os::unix::fs::PermissionsExt;
+        let fixture = PathBuf::from(std::env::var_os("LLAMA_XDG_FIXTURE").unwrap());
+        let old = fixture.join("application/data");
+        assert_eq!(profile_directory(), fixture.join("config/llama-launcher"));
+        let _lock = acquire_lock(&profile_directory()).unwrap();
+        initialize_portable().unwrap();
+        let config: crate::config::Config = load_optional(
+            &crate::locations::record("working-settings.bin"),
+            1024 * 1024,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(config.models_path, old.join("models").to_string_lossy());
+        assert_eq!(
+            config.model_file,
+            old.join("models/example.gguf").to_string_lossy()
+        );
+        assert!(Path::new(&config.model_file).is_file());
+        assert_eq!(
+            crate::locations::models(),
+            fixture.join("Localized downloads/LLamaLauncher/models")
+        );
+        assert_eq!(
+            crate::registry::runtimes_dir(),
+            fixture.join("data/llama-launcher/runtimes")
+        );
+        assert_eq!(
+            crate::locations::record("downloads.bin"),
+            fixture.join("state/llama-launcher/downloads.bin")
+        );
+        assert_eq!(
+            crate::locations::probes(),
+            fixture.join("cache/llama-launcher/probes")
+        );
+        let registry = crate::registry::list().unwrap();
+        assert!(
+            !registry[0].managed,
+            "Retained external runtimes must not be deleted as new managed installs"
+        );
+        assert_eq!(
+            registry[0].path,
+            old.join("runtimes/build/llama-server").to_string_lossy()
+        );
+        let queue: Vec<crate::downloads::DownloadPlan> =
+            load_optional(&crate::locations::record("downloads.bin"), 4 * 1024 * 1024)
+                .unwrap()
+                .unwrap();
+        assert!(queue.is_empty());
+        let monitoring: crate::monitor::MonitoringPreferences =
+            load_optional(&crate::locations::record("monitoring.bin"), 4096)
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            monitoring.interval_seconds, 7,
+            "Keep an existing XDG preference"
+        );
+        assert!(issues()
+            .iter()
+            .any(|issue| issue["name"] == "mcp-profile.bin"));
+        assert!(load_profile().is_none());
+        recover("mcp-profile.bin", "restore").unwrap();
+        assert_eq!(
+            load_profile().unwrap().cwd,
+            old.join("models").to_string_lossy()
+        );
+        assert!(fs::read_dir(profile_directory())
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| entry.file_name().to_string_lossy().contains(".preserved-")));
+        assert_eq!(
+            fs::metadata(crate::locations::record("working-settings.bin"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+        assert_eq!(
+            fs::metadata(profile_directory())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        // The marker prevents re-importing a previous source over newer settings.
+        fs::write(old.join("monitoring.bin"), b"broken old preference").unwrap();
+        initialize_portable().unwrap();
+        assert_eq!(
+            fs::read(crate::locations::record("monitoring.bin")).unwrap(),
+            fs::read(fixture.join("monitor-copy")).unwrap()
+        );
+    }
+    #[test]
+    fn xdg_migration_preserves_paths_originals_backups_and_existing_preferences() {
+        let fixture = std::env::temp_dir().join(format!(
+            "llama-xdg-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old = fixture.join("application/data");
+        fs::create_dir_all(old.join("models")).unwrap();
+        fs::create_dir_all(old.join("runtimes/build")).unwrap();
+        fs::create_dir_all(fixture.join("config/llama-launcher")).unwrap();
+        fs::write(
+            fixture.join("application/launcher.AppImage"),
+            b"synthetic path marker, never executed",
+        )
+        .unwrap();
+        fs::write(
+            fixture.join("config/user-dirs.dirs"),
+            format!(
+                "XDG_DOWNLOAD_DIR=\"{}\"\n",
+                fixture.join("Localized downloads").display()
+            ),
+        )
+        .unwrap();
+        let preferences = br#"{"enabled":false,"interval_seconds":7}"#;
+        fs::write(
+            fixture.join("config/llama-launcher/monitoring.bin"),
+            preferences,
+        )
+        .unwrap();
+        fs::write(fixture.join("monitor-copy"), preferences).unwrap();
+        fs::write(old.join("launcher.lock"), b"").unwrap();
+        fs::write(
+            old.join("models/example.gguf"),
+            b"synthetic model path fixture, not weights",
+        )
+        .unwrap();
+        let config = crate::config::Config {
+            models_path: format!("{RELATIVE_PREFIX}models"),
+            model_file: format!("{RELATIVE_PREFIX}models/example.gguf"),
+            ..Default::default()
+        };
+        let saved =
+            serde_json::to_vec(&serde_json::json!({"_launcher_record_version":1,"payload":config}))
+                .unwrap();
+        fs::write(old.join("working-settings.bin"), &saved).unwrap();
+        fs::write(old.join("downloads.bin"), b"[]").unwrap();
+        fs::write(
+            old.join("monitoring.bin"),
+            br#"{"enabled":true,"interval_seconds":3}"#,
+        )
+        .unwrap();
+        let registry = serde_json::json!([{"id":"runtime-fixture","kind":"runtime","name":"fixture","path":format!("{RELATIVE_PREFIX}runtimes/build/llama-server"),"version":"fixture","managed":true,"details":{}}]);
+        fs::write(
+            old.join("artifacts.bin"),
+            serde_json::to_vec(&registry).unwrap(),
+        )
+        .unwrap();
+        fs::write(old.join("mcp-profile.bin"), b"damaged fixture").unwrap();
+        let profile = Profile {
+            cwd: format!("{RELATIVE_PREFIX}models"),
+            ..Default::default()
+        };
+        fs::write(
+            old.join("mcp-profile.bin.bak"),
+            serde_json::to_vec(&profile).unwrap(),
+        )
+        .unwrap();
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "storage::xdg_tests::layout_fixture", "--ignored"])
+            .env_remove("LLAMA_LAUNCHER_DATA_DIR")
+            .env("LLAMA_XDG_FIXTURE", &fixture)
+            .env("APPIMAGE", fixture.join("application/launcher.AppImage"))
+            .env("XDG_CONFIG_HOME", fixture.join("config"))
+            .env("XDG_DATA_HOME", fixture.join("data"))
+            .env("XDG_STATE_HOME", fixture.join("state"))
+            .env("XDG_CACHE_HOME", fixture.join("cache"))
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert_eq!(fs::read(old.join("working-settings.bin")).unwrap(), saved);
+        assert_eq!(
+            fs::read(old.join("mcp-profile.bin")).unwrap(),
+            b"damaged fixture"
+        );
+        assert!(old.join("models/example.gguf").is_file());
+        fs::remove_dir_all(fixture).unwrap();
     }
 }

@@ -2,6 +2,10 @@
 
 ## Current unreleased baseline: Debian 13
 
+Current source follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/0.8/) for Linux config, application data, state and cache, and uses [XDG user directories](https://docs.gtk.org/glib/func.get_user_special_dir.html) for the default model-download location. The shared policy is `tauri-app/src/locations.rs`; defaults, migration and explicit overrides are documented in README. An AppImage's parent directory is no longer the default writable data directory. Native window smoke checks verify a custom Downloads folder containing spaces, private config permissions and the absence of adjacent AppImage data.
+
+Typography uses the desktop system font and relative sizes. The header offers a saved 90–200% text preference; browser checks cover large text across the main sections and smaller windows. Historical migration evidence below retains its original scope; new checks must execute before being reported as passed.
+
 The user selected Debian 13 and newer distributions during the full dependency pass. Source builds now run inside Debian 13 with glibc 2.41, WebKitGTK >=2.54.0 and OpenSSL >=3.5.7. Ubuntu 24.04 remains only the GitHub Docker host. Clean startup targets Debian 13 and Ubuntu 26.04 without installed WebKitGTK/FUSE; the compatibility job is separate from the build container and is required before publication. This does not replace existing 1.1.2 assets or change their glibc 2.39 baseline. Current source/package evidence and remaining upstream-vs-distro gaps are in [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md).
 
 ## Migration implementation (published 1.1.2 history)

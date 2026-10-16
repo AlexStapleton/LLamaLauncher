@@ -17,6 +17,7 @@ mod gguf;
 mod hashing;
 mod hub;
 mod jobs;
+mod locations;
 mod logging;
 mod mcp;
 mod monitor;
@@ -476,7 +477,7 @@ fn runtime_help(binary: &str, force: bool) -> Result<String, String> {
     {
         return Err("Choose llama-server.exe first.".into());
     }
-    let cache = storage::profile_directory().join("cache");
+    let cache = locations::cache();
     fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -614,7 +615,7 @@ fn read_server_logs(app: tauri::AppHandle) -> Result<String, String> {
         .ok()
         .and_then(|m| m.instance.as_ref().map(|i| i.config.clone()));
     let secrets = config.as_ref().map(credentials::values).unwrap_or_default();
-    let directory = storage::profile_directory().join("logs");
+    let directory = locations::state().join("logs");
     let mut result = format!("Log folder: {}\n", directory.display());
     for name in ["server-stderr.log", "server-stdout.log"] {
         result.push_str(&format!("\n--- {name} ---\n"));
@@ -628,7 +629,7 @@ fn read_server_logs(app: tauri::AppHandle) -> Result<String, String> {
 async fn get_defaults(app: tauri::AppHandle) -> Result<Config, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut config = Config::default();
-        let models = storage::profile_directory().join("models");
+        let models = locations::models();
         fs::create_dir_all(&models).map_err(|_| "Cannot create the portable models folder")?;
         config.models_path = models.to_string_lossy().into();
         let mut candidates = Vec::new();
@@ -1095,7 +1096,7 @@ fn start_server_inner(
                 .map_err(|e| format!("Cannot use {}:{}: {}", host, config.port, e))?,
         );
     }
-    let log_dir = storage::profile_directory().join("logs");
+    let log_dir = locations::state().join("logs");
     fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
     let stdout = logging::Writer::open(&log_dir.join("server-stdout.log"), logging::STREAM_LIMIT)
         .map_err(|e| e.to_string())?;
@@ -1125,7 +1126,7 @@ fn start_server_inner(
     }
     command.args(arguments(&config, model.as_deref()));
     let snapshot = if config.mcp_profile.enabled {
-        let cache = storage::profile_directory().join("cache");
+        let cache = locations::cache();
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| e.to_string())?
@@ -1419,7 +1420,7 @@ fn main() {
     };
     if let Err(error) = storage::initialize_portable() {
         rfd::MessageDialog::new()
-            .set_title("Cannot initialize portable storage")
+            .set_title("Cannot initialize saved data")
             .set_description(error)
             .set_level(rfd::MessageLevel::Error)
             .show();
@@ -1456,7 +1457,7 @@ fn main() {
         .setup(move |app| {
             for window in windows {
                 tauri::WebviewWindowBuilder::from_config(app, &window)?
-                    .data_directory(storage::profile_directory().join("webview"))
+                    .data_directory(locations::data().join("webview"))
                     .build()?;
             }
             session::watch_router(

@@ -5,13 +5,14 @@ fixture="$(mktemp -d)"
 export XDG_CONFIG_HOME="$fixture/config"
 export XDG_CACHE_HOME="$fixture/cache"
 export XDG_DATA_HOME="$fixture/data"
-if [[ $# -eq 0 ]]; then
-  export LLAMA_LAUNCHER_DATA_DIR="$fixture/launcher-data"
-  expected_data="$LLAMA_LAUNCHER_DATA_DIR"
-else
-  unset LLAMA_LAUNCHER_DATA_DIR
-  expected_data="$(dirname "$(realpath "$1")")/data"
-  [[ ! -e "$expected_data" ]] || { echo 'Use a fresh AppImage directory for this check' >&2; exit 1; }
+export XDG_STATE_HOME="$fixture/state"
+unset LLAMA_LAUNCHER_DATA_DIR
+expected_data="$XDG_CONFIG_HOME/llama-launcher"
+mkdir -p "$XDG_CONFIG_HOME"
+printf 'XDG_DOWNLOAD_DIR="%s"\n' "$fixture/Model downloads" > "$XDG_CONFIG_HOME/user-dirs.dirs"
+if [[ $# -gt 0 ]]; then
+  adjacent_data="$(dirname "$(realpath "$1")")/data"
+  [[ ! -e "$adjacent_data" ]] || { echo 'Use a fresh AppImage directory for this check' >&2; exit 1; }
 fi
 export XDG_RUNTIME_DIR="$fixture/runtime"
 mkdir -p "$XDG_RUNTIME_DIR"
@@ -29,8 +30,16 @@ for ((attempt=0;attempt<60;attempt++)); do
   if ! kill -0 "$launcher_pid" 2>/dev/null; then cat "$fixture/stderr"; exit 1; fi
   if grep -E 'panicked at|Unable to initialize|error while loading shared libraries' "$fixture/stderr"; then cat "$fixture/stderr"; exit 1; fi
   if [[ -s "$expected_data/working-settings.bin" ]] && xwininfo -root -tree | grep -q 'Llama Server Configuration Manager'; then
+    grep -Fq "$fixture/Model downloads/LLamaLauncher/models" "$expected_data/working-settings.bin"
+    test -d "$fixture/Model downloads/LLamaLauncher/models"
+    test -d "$XDG_DATA_HOME/llama-launcher"
+    test -d "$XDG_STATE_HOME/llama-launcher"
+    test -d "$XDG_CACHE_HOME/llama-launcher"
+    [[ $(stat -c %a "$expected_data/working-settings.bin") == 600 ]]
+    [[ $(stat -c %a "$expected_data") == 700 ]]
+    if [[ $# -gt 0 ]]; then test ! -e "$adjacent_data"; fi
     cp "$fixture/stderr" artifacts/linux-window-stderr.log
-    echo 'Native Linux window initialized and frontend saved private settings at the expected data location.'
+    echo 'Native Linux window initialized, saved private XDG configuration, and used the configured XDG Downloads folder without adjacent AppImage data.'
     exit 0
   fi
   sleep 1

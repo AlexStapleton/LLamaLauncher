@@ -145,7 +145,7 @@ pub fn reserve(state: &State, plan: &DownloadPlan) -> Result<(), String> {
 }
 
 fn path() -> PathBuf {
-    crate::storage::profile_directory().join("downloads.bin")
+    crate::locations::record("downloads.bin")
 }
 
 pub(crate) fn safe_name(name: &str) -> Result<(), String> {

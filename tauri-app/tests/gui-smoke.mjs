@@ -29,6 +29,7 @@ try {
   browser = await chromium.launch({ headless:true, ...(process.env.LLAMA_TEST_BROWSER ? {channel:process.env.LLAMA_TEST_BROWSER} : {}) });
   const page = await browser.newPage({ viewport:{width:1200,height:700} });
   async function openSection(name) {
+    if(name==='Connections'){await page.getByRole('button',{name:/^Connections/}).click();return;}
     const groups = {'Performance':'Settings','GPU & memory':'Settings','Context & cache':'Settings','Chat & output':'Settings','Sampling':'Settings','API':'Settings','Advanced':'Settings','All options':'Settings','Dashboard':'Activity','Test':'Activity','Logs':'Activity','Downloads & tasks':'Activity'};
     if(groups[name]) await page.getByRole('button',{name:groups[name],exact:true}).click();
     await page.getByRole('button',{name:name==='Setup'||name==='Runtimes'?'Launch':name==='Models & downloads'?'Models':name,exact:name!=='All options'}).click();
@@ -343,6 +344,36 @@ try {
   await page.getByRole('button',{name:'Models',exact:true}).click();await page.locator('#theme_toggle').click();
   await page.screenshot({path:path.join(root,'artifacts/gui-redesign-models-dark.png')});
   await page.locator('#theme_toggle').click();
+  for (const [width,height,scale] of [[1200,760,'100'],[1200,760,'125'],[800,600,'150'],[640,600,'200']]) {
+    await page.setViewportSize({width,height});
+    await page.locator('#text_size').selectOption(scale);
+    await openSection('Performance');
+    await page.locator('.settings-panel').evaluate(panel=>panel.scrollTop=0);
+    const metrics=await page.evaluate(()=>({
+      root:parseFloat(getComputedStyle(document.documentElement).fontSize),
+      helper:parseFloat(getComputedStyle(document.querySelector('.option-description')).fontSize),
+      workspace:document.querySelector('.workspace').getBoundingClientRect().height,
+      overflow:document.body.scrollWidth>innerWidth,
+      headerOverflow:document.querySelector('.app-header').scrollWidth>document.querySelector('.app-header').clientWidth,
+    }));
+    assert.equal(metrics.root,16*Number(scale)/100);
+    assert.ok(metrics.helper>=14*Number(scale)/100);
+    assert.ok(metrics.workspace>100,`Text ${scale}% at ${width}: workspace ${metrics.workspace}`);
+    assert.equal(metrics.overflow,false,`Text ${scale}% overflows at ${width}`);
+    assert.equal(metrics.headerOverflow,false,`Header clips at ${scale}% / ${width}`);
+    await page.screenshot({path:path.join(root,'artifacts',`gui-text-${scale}-${width}.png`)});
+    for(const section of ['Setup','Models & downloads','Profiles','Dashboard','Connections']) {
+      await openSection(section);
+      assert.equal(await page.evaluate(()=>{
+        const panel=document.querySelector('.settings-panel');
+        return panel.scrollWidth>panel.clientWidth+1;
+      }),false,`${section} requires sideways page scrolling at ${scale}% / ${width}`);
+    }
+  }
+  await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.ready==='true');
+  assert.equal(await page.locator('#text_size').inputValue(),'200');
+  assert.equal(await page.locator('html').evaluate(element=>getComputedStyle(element).fontSize),'32px');
+  await page.locator('#text_size').selectOption('100');
   await reviewUiChecks(page,openSection,featureFixture);
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({passed:true,optionGroups:expected,models:fixtureModels.length,checks:['adjustable persistent monitoring/off','hardware detection while monitoring off','GGUF inspection','HF token/search/shard selection/download','router load','inference response','runtime import/releases','saved benchmark comparison','profiles create/update/rename/duplicate/delete','profile reload/quick launch','unsaved switch confirmation','saved missing model preservation','compact grouped Performance','persistent dark mode','MCP connect/test/disconnect','tool discovery/search','router mode','credential exclusion','visible Stop','nested model selection','option override','all flags','fixed navigation','search','save configuration','start/stop','logs','responsive layout','no JS errors']}));

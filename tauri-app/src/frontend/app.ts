@@ -9,6 +9,7 @@ import { listen } from '@tauri-apps/api/event';
 import { initializeProfiles } from './profile-ui';
 import { initializeFeatures } from './features-ui';
 import { initializeStorage } from './storage-ui';
+import { initializeTextSize } from './display';
 
 import { control as el, node, errorText } from './dom';
 import type { Config, ModelInfo, ArgumentOverride, Profile } from './native-types';
@@ -411,6 +412,7 @@ async function initialize() {
   let portableSettings;try{portableSettings=await invoke('working_load');}catch(error){report(error,true);}
   if(portableSettings)saved=portableSettings;
   hydrate(saved, !Array.isArray(saved.argument_overrides)); updateCatalogControls();
+  initializeTextSize(el('text_size'));
   let theme=localStorage.getItem('llama_theme')==='dark'?'dark':'light';
   const setTheme=()=>{document.documentElement.dataset.theme=theme;el('theme_toggle').textContent=theme==='dark'?'Light mode':'Dark mode';el('theme_toggle').setAttribute('aria-pressed',String(theme==='dark'));localStorage.setItem('llama_theme',theme);};
   setTheme();el('theme_toggle').addEventListener('click',()=>{theme=theme==='dark'?'light':'dark';setTheme();});
@@ -464,7 +466,7 @@ async function initialize() {
   document.documentElement.dataset.ready = 'true'; report('Ready. Choose a GGUF in Models, then start the server.');
   showStatus('stopped'); await Promise.all([refreshModels(false,true), refreshCatalog()]);
   await profileUi.initialize().catch(error=>report(`Cannot read profiles: ${error}`,true));
-  el('profile_storage').textContent=`Saved beside the launcher: ${await invoke('storage_location')}`;
+  el('profile_storage').textContent=`Saved profiles and settings: ${await invoke('storage_location')}`;
   if(config.mcp_profile.enabled)mcpUi.connect();
 }
 initialize().catch(error => report(`Cannot initialize: ${error?.message || error}`, true));
