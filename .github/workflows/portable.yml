@@ -43,7 +43,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           bash package-appimage.sh
-          bash tests/appimage-clean-host.sh "$(realpath artifacts/release/LLamaLauncher-1.1.1-Linux-x86_64.AppImage)"
+          bash tests/appimage-clean-host.sh "$(realpath artifacts/release/LLamaLauncher-1.1.2-Linux-x86_64.AppImage)"
       - uses: actions/upload-artifact@v7
         with:
           name: release-packages-${{ runner.os }}

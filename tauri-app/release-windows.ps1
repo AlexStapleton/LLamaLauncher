@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
     $releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
-    if($releaseVersion -ne '1.1.1'){throw 'This release recipe expects version 1.1.1'}
+    if($releaseVersion -ne '1.1.2'){throw 'This release recipe expects version 1.1.2'}
     $inputFolder=Join-Path $PSScriptRoot 'artifacts/release-inputs'
     New-Item -ItemType Directory -Path $inputFolder -Force | Out-Null
     $cab=Join-Path $inputFolder 'WebView2-fixed-x64.cab'
@@ -17,5 +17,5 @@ try {
     if(-not $webview -or (Get-AuthenticodeSignature -LiteralPath $webview.FullName).Status -ne 'Valid'){throw 'Fixed WebView2 signature invalid'}
     & ./package-windows.ps1 -FixedWebView2Directory $webview.DirectoryName -ExecutablePath target/release/llama-server-configurator.exe -SkipBuild
     if($LASTEXITCODE -ne 0){throw 'Windows installer packaging failed'}
-    & ./tests/windows-installer-smoke.ps1 -InstallerPath artifacts/release/LLamaLauncher-1.1.1-Windows-x86_64-Setup.exe
+    & ./tests/windows-installer-smoke.ps1 -InstallerPath artifacts/release/LLamaLauncher-1.1.2-Windows-x86_64-Setup.exe
 } finally { Pop-Location }

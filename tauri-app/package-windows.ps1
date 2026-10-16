@@ -36,7 +36,7 @@ try {
     })
     $lines | Set-Content -LiteralPath $owned -Encoding utf8
     $icon=(Resolve-Path icons/icon.ico).Path
-    & $MakeNsis /V2 "/DSTAGE=$stage" "/DOUTPUT=$output" "/DVERSION=$version" "/DOWNED_FILES=$owned" "/DICON=$icon" installer/windows.nsi
+    & $MakeNsis /V2 /WX "/DSTAGE=$stage" "/DOUTPUT=$output" "/DVERSION=$version" "/DOWNED_FILES=$owned" "/DICON=$icon" installer/windows.nsi
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $output)) { throw 'NSIS setup build failed' }
     "$((Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLower())  $(Split-Path $output -Leaf)" | Set-Content -LiteralPath "$output.sha256" -Encoding utf8
     Write-Output "Windows setup: $output"

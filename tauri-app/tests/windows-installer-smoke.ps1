@@ -12,6 +12,14 @@ function Install-Package {
     if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 }
 Install-Package
+$uninstallKey='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher'
+$uninstallExe=Join-Path $installed 'Uninstall.exe'
+function Check-RegisteredUninstall {
+    $registration=Get-ItemProperty -LiteralPath $uninstallKey
+    if ($registration.UninstallString -cne ('"'+$uninstallExe+'"') -or $registration.QuietUninstallString -cne ('"'+$uninstallExe+'" /S')) { throw 'Windows Installed apps uninstall command is incorrectly registered' }
+    if ($registration.InstallLocation -cne $installed) { throw 'Windows Installed apps points to another installation' }
+}
+Check-RegisteredUninstall
 $env:LLAMA_LAUNCHER_EXE=Join-Path $installed 'llama-server-configurator.exe'
 $env:CI='true'
 & node (Join-Path $PSScriptRoot 'portable-package-smoke.mjs')
@@ -25,10 +33,13 @@ $unrelated=Join-Path $installed 'keep-unrelated.txt'
 # Allow the smoke test's owned process and WebView children to finish closing.
 Start-Sleep -Seconds 2
 Install-Package
+Check-RegisteredUninstall
 if ((Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash -ne $digest -or -not (Test-Path -LiteralPath $marker)) { throw 'Upgrade changed saved data' }
-$process=Start-Process -FilePath (Join-Path $installed 'Uninstall.exe') -ArgumentList "/S _?=$installed" -WindowStyle Hidden -PassThru
+$registered=(Get-ItemProperty -LiteralPath $uninstallKey).UninstallString
+$process=Start-Process -FilePath $registered.Substring(1,$registered.Length-2) -ArgumentList "/S _?=$installed" -WindowStyle Hidden -PassThru
 if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'Uninstaller exceeded two minutes' }
 if ($process.ExitCode -ne 0) { throw "Uninstaller failed: $($process.ExitCode)" }
 if ((Test-Path -LiteralPath $env:LLAMA_LAUNCHER_EXE) -or (Test-Path -LiteralPath (Join-Path $installed 'WebView2/msedgewebview2.exe'))) { throw 'Uninstall left packaged application files' }
 if ((Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash -ne $digest -or -not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath $unrelated)) { throw 'Uninstall removed or changed user files' }
-Write-Output 'Installer, real GUI startup, upgrade preservation, and safe uninstall passed.'
+if (Test-Path -LiteralPath $uninstallKey) { throw 'Uninstall registration was not removed' }
+Write-Output 'Installer, real GUI startup, Windows Installed apps registration, upgrade preservation, and safe registered uninstall passed.'

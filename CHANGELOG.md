@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2 — 2026-10-16
+
+- Correct the quoted Windows Installed apps uninstall command, register silent uninstall, and validate the real registry values on fresh install and upgrade. Exercise the registered uninstaller and preserve user data. Treat NSIS compiler warnings as errors.
+- Carry forward the Tauri 2 migration, Windows setup EXE and clean-host-tested WebKitGTK 4.1/libsoup 3 AppImage. Published 1.1.1 assets remain unchanged.
+
+
 ## 1.1.1 — 2026-10-16
 
 - Migrate to stable Tauri 2.12.4 and current JavaScript/CLI APIs; preserve CSP and restrict event permissions to the main local window. Replace Linux WebKitGTK 4.0/libsoup 2 with 4.1/libsoup 3, require the WebKit 2.52.6+ engine line, and publish exact native package versions. The Linux baseline is Ubuntu 24.04/glibc 2.39.

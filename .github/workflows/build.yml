@@ -61,20 +61,20 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a bash tests/linux-window-smoke.sh
       - name: Windows installer compiler
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
         shell: pwsh
         run: choco install nsis --version=3.11 -y --no-progress
       - name: Package Windows release with fixed WebView2
         timeout-minutes: 20
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
         shell: pwsh
         run: ./release-windows.ps1
       - name: Package self-contained Linux AppImage
         timeout-minutes: 20
-        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
         run: bash release-linux.sh
       - uses: actions/upload-artifact@v7
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
         with:
           name: release-assets-${{ runner.os }}
           path: tauri-app/artifacts/release/*
@@ -98,7 +98,7 @@ jobs:
           if-no-files-found: error
   release:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -110,7 +110,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: Publish verified 1.1.1 installers and checksums
+      - name: Publish verified 1.1.2 installers and checksums
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node tauri-app/tests/publish-release.mjs

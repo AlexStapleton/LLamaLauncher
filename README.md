@@ -1,8 +1,8 @@
 # LLamaLauncher
 
-A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Windows and Linux builds passed native GitHub Actions validation for 1.1. Release 1.1.1 switches downloads to a Windows setup executable and Linux AppImage.
+A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Windows and Linux builds passed native GitHub Actions validation for 1.1. Release 1.1.2 switches downloads to a Windows setup executable and Linux AppImage.
 
-Version 1.1.1 packaging notes and download instructions are in [RELEASE_NOTES_1.1.1.md](RELEASE_NOTES_1.1.1.md). Publication is gated on both platform jobs; packages include checksums and dependency notices. Windows packages remain unsigned beta builds.
+Version 1.1.2 packaging notes and download instructions are in [RELEASE_NOTES_1.1.2.md](RELEASE_NOTES_1.1.2.md). Publication is gated on both platform jobs; packages include checksums and dependency notices. Windows packages remain unsigned beta builds.
 
 ## Features
 
@@ -40,8 +40,8 @@ Use the latest release's **Windows-x86_64-Setup.exe** on Windows. It installs fo
 On Linux, download **Linux-x86_64.AppImage**, place it in a writable folder and run:
 
 ```sh
-chmod +x LLamaLauncher-1.1.1-Linux-x86_64.AppImage
-./LLamaLauncher-1.1.1-Linux-x86_64.AppImage
+chmod +x LLamaLauncher-1.1.2-Linux-x86_64.AppImage
+./LLamaLauncher-1.1.2-Linux-x86_64.AppImage
 ```
 
 If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; no host WebKitGTK 4.0 installation is required. Linux x86_64 with glibc 2.39 or newer and a desktop display is required; this is not an ARM or Alpine/musl build. Keep the adjacent `data` folder when replacing the AppImage. The old 1.1 Linux ZIP was a raw binary requiring system WebKitGTK; use the new AppImage instead.
@@ -69,7 +69,7 @@ npm ci
 bash build-linux.sh
 ```
 
-Use the native Linux Rust toolchain. The result is `tauri-app/desktop-app/llama-server-configurator`. A desktop display session is required to run the GUI. This raw developer binary needs the system libraries above. For the distributable AppImage, run `bash package-appimage.sh` on Linux (the script uses the locked Tauri 2 CLI through npx). Native Linux CI passed for 1.1; 1.1.1 adds AppImage and clean-host packaging checks.
+Use the native Linux Rust toolchain. The result is `tauri-app/desktop-app/llama-server-configurator`. A desktop display session is required to run the GUI. This raw developer binary needs the system libraries above. For the distributable AppImage, run `bash package-appimage.sh` on Linux (the script uses the locked Tauri 2 CLI through npx). Native Linux CI passed for 1.1; 1.1.2 adds AppImage and clean-host packaging checks.
 
 ## MCP and router mode
 
