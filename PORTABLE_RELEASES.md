@@ -40,7 +40,9 @@ Put the AppImage in a writable folder, mark it executable and run it. Without FU
 
 ## Release and verification policy
 
-Ordinary main-branch CI builds both packages and runs their native checks before a future release. The release publisher verifies the exact expected executable/AppImage and checksums. Existing published tags/assets must not be replaced with different bytes; a new version and reviewed release notes are required to publish these changes. The historical 1.1.2 trigger cannot republish its changed source because its existing release targets another commit.
+Ordinary main-branch CI builds both packages and runs their native checks before a future release. After Windows smoke tests and Linux clean-host checks pass, the artifacts named `LLamaLauncher-<version>-Windows-x86_64.exe` and `LLamaLauncher-<version>-Linux-x86_64.AppImage` are uploaded directly with `archive: false`: downloading these individual artifacts does not require unzipping. GitHub sign-in and artifact retention limits apply. Separate internal release/checksum and diagnostic archives remain for automation; choose the artifacts with the actual executable/AppImage filenames to test the application.
+
+The release publisher verifies the exact expected executable/AppImage and checksums. Existing published tags/assets must not be replaced with different bytes; a new version and reviewed release notes are required to publish these changes. The historical 1.1.2 trigger cannot republish its changed source because its existing release targets another commit.
 
 The dependency pass after 1.1.2 refreshes Node, NSIS, Fixed WebView2 and app-local VC DLLs, and moves Linux builds to Debian 13; [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md) records exact pins, executed checks and remaining constraints. `WINDOWS_PACKAGE_VERSIONS.json` records Microsoft runtime versions/signers/hashes. Linux inventories record native package versions. SHA256 checksums verify bytes, not publisher identity. Builds remain unsigned beta packages until the acceptance gates in [PRODUCTION_READINESS_REVIEW.md](PRODUCTION_READINESS_REVIEW.md) pass. No certificate or private key belongs in the repository.
 
