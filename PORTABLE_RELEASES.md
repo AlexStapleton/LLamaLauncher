@@ -1,49 +1,57 @@
 # Portable releases
 
-The public downloads are a Windows **setup `.exe`** and Linux **`.AppImage`**, plus SHA256 checksums. Windows setup includes the private x64 Fixed Version WebView2 runtime and licensed VC runtime DLLs; it installs for the current user, adds shortcuts, and preserves `data` on upgrade and uninstall. The default installation is `%LOCALAPPDATA%\Programs\LLamaLauncher`, a writable location so profiles remain beside the EXE. Close the application and stop its server before updating. Choose an existing portable folder in setup or copy its protected `data` folder while closed to retain it; Windows credentials require the same Windows account.
+Current source builds produce **one portable Windows `.exe`** and **one Linux `.AppImage`**, plus optional SHA256 checksum files. Earlier published 1.1.2 assets remain unchanged: that Windows download is a setup installer, not the new portable container.
 
-The AppImage bundles WebKitGTK and its process helpers; it does not require `libwebkit2gtk-4.0.so.37` from the host. Put it in a writable folder, `chmod +x` it and run it. Use `--appimage-extract-and-run` without FUSE. Its managed data is beside the original AppImage, outside the temporary mount. The supported baseline is Linux x86_64, glibc 2.39+, with a desktop session; broader distribution/GPU testing remains necessary.
+## Windows
 
-llama.cpp and model weights are installed separately through Launch and Models, or linked from existing files. Distribution packages never contain developer data. Windows private records are account-bound; Linux uses private permissions. Both packaging paths retain offline settings documentation and dependency licenses.
+Put `LLamaLauncher-<version>-Windows-x86_64.exe` in a writable folder and double-click it. The GUI opens directly. It does not install a system runtime, register an uninstaller, or create desktop/Start menu shortcuts. You can create a shortcut to the downloaded EXE yourself.
 
-Download the **Fixed Version x64** WebView2 CAB from https://developer.microsoft.com/en-us/microsoft-edge/webview2/ and accept Microsoft's redistribution terms. Extract it with Windows `expand.exe`, then provide its directory to the packaging script. Do not substitute the Evergreen installer or copy a system browser installation. Keep Microsoft notices and the runtime's license files in the package. Fixed WebView2 updates require a new launcher release.
+The single download embeds the application, private x64 Fixed WebView2, licensed VC DLLs, dependency notices and offline settings documentation. Windows requires the runtime's individual files on disk: the container extracts them into a unique NSIS-owned temporary folder for the session, waits for the GUI, and cleans up on normal exit. Extraction adds startup time and temporary disk usage. A forced termination or power loss can leave temporary files for Windows to clean later. Runtime files never contain profiles/models.
 
-Install NSIS 3 (makensis.exe). From `tauri-app` in PowerShell:
+Profiles, settings, logs, installed llama.cpp engines and default model downloads remain in **data beside the original downloaded EXE**, not beside its temporary copy or in the current working directory. Saved-data recovery restarts the GUI through the container while retaining its runtime. Keep the EXE and data together when moving them. Close the app and stop its server before replacing the EXE to update. No uninstall is needed: remove the EXE; keep data if you want your settings/models. Windows private records remain protected by the same Windows account.
+
+Build the native release first, then run from `tauri-app`:
 
 ```powershell
-./package-windows.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
+./release-windows.ps1
 ```
 
-For current Linux x64 source builds, use Debian 13 with the Node version in `.nvmrc`, current stable Rust, Tauri 2 development libraries and `xvfb` installed. The script invokes the locked Tauri 2 CLI through npx and creates an ignored configuration override, preserves `tauri.conf.json`, and checks FUSE-free startup. The new build baseline is glibc 2.41 or newer, selected to prioritize Debian 13 and newer distributions. Ubuntu 24.04, Debian 12, ARM and musl are outside the new asset's target. The published 1.1.2 AppImage remains unchanged on its glibc 2.39 baseline.
+The recipe fetches official Microsoft inputs pinned in `runtime-inputs.json`, checks hashes, signatures, exact versions and x64 architecture, extracts app-local VC DLLs without installing a system runtime, and compiles the container with NSIS 3.13. It produces `artifacts/release/LLamaLauncher-<version>-Windows-x86_64.exe` and its checksum. It then runs `tests/windows-portable-smoke.ps1` against a fresh copy: real GUI/embedded WebView2, adjacent private settings, rename/relaunch preservation, normal temporary cleanup and no installer registration/desktop shortcut changes. These checks are distinct from broad clean-Windows/GPU coverage.
+
+For manually prepared, verified redistribution inputs:
+
+```powershell
+./package-windows.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64' -VCRuntimeDirectory 'D:/BuildInputs/VC-x64' -SkipBuild -ExecutablePath 'target/release/llama-server-configurator.exe'
+```
+
+Keep Microsoft's redistribution notices and the runtime's license files in the embedded stage. Do not copy an installed system browser. Fixed WebView2 servicing requires a new verified package. Models, engines, private data and test fixtures are excluded. `package-portable.ps1 -StageOnly` is the internal staging helper; its directory/ZIP output is not the public Windows download.
+
+## Linux
+
+Build on Debian 13 using the Node version in `.nvmrc`, current stable Rust, Tauri 2 development libraries and xvfb:
 
 ```bash
-bash package-appimage.sh
+bash release-linux.sh
 ```
 
-Run the AppImage directly. If FUSE is unavailable, use `./LLamaLauncher.AppImage --appimage-extract-and-run` or `APPIMAGE_EXTRACT_AND_RUN=1`. Launch provides a Stable/Beta choice and validates the available official backend candidates, with a verified CPU fallback. Device enumeration is not a substitute for the supported hardware/driver test matrix.
+The locked Tauri CLI uses an ignored configuration override, preserving `tauri.conf.json`. The AppImage bundles WebKitGTK 4.1/libsoup 3 and their process helpers, including support libraries identified by clean-host tests. Native versions, copyrights, dependency notices and the settings guide are included. Docker is required for clean-host verification on Debian 13 and Ubuntu 26.04 without system WebKitGTK/FUSE. Root-only WebKit sandbox overrides are confined to disposable test processes, not the production launcher.
 
-Before release, test offline GUI startup, online engine installation, and local CPU inference on a clean Windows x64 VM, Debian 13 and newer distributions. Clean AppImage startup targets Debian 13 and Ubuntu 26.04. Test Windows without installed WebView2 and Linux without FUSE. Verify SHA256SUMS, licenses and dependency notices. A successful build is not proof that these checks passed.
+Put the AppImage in a writable folder, mark it executable and run it. Without FUSE, use `./LLamaLauncher.AppImage --appimage-extract-and-run` or `APPIMAGE_EXTRACT_AND_RUN=1`. Managed data is beside the original AppImage, outside its temporary mount. New source builds require Linux x86_64 and glibc 2.41 or newer; Ubuntu 24.04, Debian 12, ARM and musl are outside that target. Published 1.1.2 keeps its original glibc 2.39 baseline. Container startup does not establish every desktop/GPU/driver combination.
+
+## Release and verification policy
+
+Ordinary main-branch CI builds both packages and runs their native checks before a future release. The release publisher verifies the exact expected executable/AppImage and checksums. Existing published tags/assets must not be replaced with different bytes; a new version and reviewed release notes are required to publish these changes. The historical 1.1.2 trigger cannot republish its changed source because its existing release targets another commit.
+
+The dependency pass after 1.1.2 refreshes Node, NSIS, Fixed WebView2 and app-local VC DLLs, and moves Linux builds to Debian 13; [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md) records exact pins, executed checks and remaining constraints. `WINDOWS_PACKAGE_VERSIONS.json` records Microsoft runtime versions/signers/hashes. Linux inventories record native package versions. SHA256 checksums verify bytes, not publisher identity. Builds remain unsigned beta packages until the acceptance gates in [PRODUCTION_READINESS_REVIEW.md](PRODUCTION_READINESS_REVIEW.md) pass. No certificate or private key belongs in the repository.
+
+Before production publication, also exercise clean Windows startup without installed WebView2, online engine installation, real inference, desktop integrations and relevant hardware/driver combinations. Local CPU/native integration and clean container startup evidence should be described accurately, without expanding it into untested coverage. Never package developer data or models.
 
 ## Hugging Face browser sign-in
 
 Register a public OAuth application without a client secret in Hugging Face settings. Configure read scopes (`openid profile read-repos gated-repos`) and paste the public client ID into Connections → Hugging Face account → Advanced: browser sign-in. Browser authorization uses device codes. The current implementation requests a new sign-in if access expires; it does not promise persistent refresh tokens. Read-token connection and public browsing work without an OAuth application registration. Never publish a personal token or add it to release configuration.
 
-The Windows packager also copies the licensed Microsoft VC x64 runtime DLLs from Visual Studio, or from `-VCRuntimeDirectory`, into the portable folder. Keep their redistribution notices with your release.
-
-## Current release policy
-
-The 1.1.2 release pipeline runs from a main-branch push whose commit message begins `Release 1.1.2`. Both platform validation jobs must pass before creating tag `1.1.2` and publishing the setup EXE, AppImage and checksums. Windows tests installation, the real GUI using bundled WebView2, upgrade data preservation, and uninstall data preservation. Linux verifies WebKitGTK and WebKitWebProcess are inside the image, then starts it in a clean Ubuntu 24.04 container with no system WebKitGTK and no FUSE. Docker is required for this clean-host check. Windows uses pinned, checksum-verified and signature-checked Microsoft Fixed WebView2 155.0.4283.45 x64. See [1.1.2 release notes](RELEASE_NOTES_1.1.2.md). The existing 1.1 release/tag remains unchanged.
-
-Local Windows packages are unsigned beta builds until the platform/hardware acceptance gates in `PRODUCTION_READINESS_REVIEW.md` pass. A checksum verifies downloaded bytes; it does not establish publisher identity. Production Windows releases require an Authenticode certificate supplied through the release environment and signature verification before packaging. No signing key or certificate is stored in this repository. Linux distributions require a corresponding verified native/AppImage test report; preparing a workflow does not close that gate.
-
-The packagers generate `THIRD_PARTY_NOTICES.txt` from locked dependency metadata and accompanying license texts. Keep this file, the application license, and Microsoft redistribution notices with the distributed binaries. Review the generated notice inventory when changing dependencies. The compatible glib source backport retains its upstream licenses and provenance; the source verification script must pass before packaging.
-
-Updates replace the application and private WebView2 runtime while preserving `data`. First copy that folder as an account-protected backup. Fixed WebView2 servicing requires rebuilding and testing a new package with the pinned official runtime and its checksum. Do not reuse a previously tested package label for changed binaries.
-
 ## Saved-data recovery
 
-Launch → Saved data & recovery shows working-save failures and damaged records. Retry saving retains the pending edits. Restore backup or Reset this record is an explicit action, preserves the original protected bytes, and restarts the application. Backups remain protected by the same Windows account (Linux: private permissions). Folder portability does not make Windows credentials readable by a different account.
+Launch → Saved data & recovery shows working-save failures and damaged records. Retry saving retains pending edits. Restore backup or Reset this record preserves the original protected bytes and restarts the GUI. Backups remain protected by the same Windows account (Linux: private permissions). Folder portability does not make Windows credentials readable by another account.
 
 Server stdout and stderr each retain three files of at most 10 MiB, for a combined 60 MiB disk cap. Known credentials are scrubbed before writing. Custom arguments remain private in profiles; shareable JSON export deliberately omits custom executable/MCP arguments and authentication fields.
-
-The dependency pass after 1.1.2 refreshes Node, NSIS, Fixed WebView2 and app-local VC DLLs, and moves Linux builds to Debian 13; see [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md) for exact pins and remaining native-library gaps. It does not replace published 1.1.2 assets. Ordinary main-branch builds validate packages before a future release. Linux runs in a Debian 13 build container, then a separate Docker host tests clean Debian 13 and Ubuntu 26.04 startup; publication requires both jobs. The builder's root-only WebKit sandbox override is limited to isolated test steps, never exported by the production launcher. Microsoft inputs are in tauri-app/runtime-inputs.json; Windows packaging extracts app-local VC DLLs without installing a system runtime.

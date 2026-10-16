@@ -1,78 +1,60 @@
+; Portable executable container. Only NSIS-owned temporary files are extracted.
 Unicode true
-!include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
 Name "LLamaLauncher"
 OutFile "${OUTPUT}"
-InstallDir "$LOCALAPPDATA\Programs\LLamaLauncher"
-InstallDirRegKey HKCU "Software\LLamaLauncher" "InstallDir"
+Icon "${ICON}"
 RequestExecutionLevel user
-; WebView2 is large. Standard zlib keeps setup builds/installs fast and permits
-; independent extraction of files; no outer archive is required by the user.
+SilentInstall silent
+AutoCloseWindow true
 SetCompressor zlib
+CRCCheck force
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey "ProductName" "LLamaLauncher"
-VIAddVersionKey "FileDescription" "LLamaLauncher Setup"
+VIAddVersionKey "FileDescription" "LLamaLauncher Portable"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "LegalCopyright" "LLamaLauncher contributors"
-!define MUI_ICON "${ICON}"
-!define MUI_UNICON "${ICON}"
-!define MUI_WELCOMEPAGE_TEXT "Install LLamaLauncher for your Windows account.$\r$\n$\r$\nIncludes the GUI runtime. llama.cpp and models are downloaded separately inside the app.$\r$\n$\r$\nProfiles, engines and models remain in data beside the application. Choose a writable folder. Updates and uninstall preserve data."
-!insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_DIRECTORY
-!insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_PAGE_FINISH
-!insertmacro MUI_UNPAGE_CONFIRM
-!insertmacro MUI_UNPAGE_INSTFILES
-!insertmacro MUI_LANGUAGE "English"
 
 Function .onInit
+  SetSilent silent
   ${IfNot} ${RunningX64}
     MessageBox MB_ICONSTOP "LLamaLauncher requires 64-bit Windows."
-    Abort
-  ${EndIf}
-  SetShellVarContext current
-FunctionEnd
-
-!macro CheckClosed
-  FindWindow $0 "" "Llama Server Configuration Manager"
-  ${If} $0 != 0
-    IfSilent +2
-    MessageBox MB_ICONSTOP "Close LLamaLauncher and stop its server before continuing."
     SetErrorLevel 2
     Quit
   ${EndIf}
-!macroend
+FunctionEnd
 
-Section "LLamaLauncher"
-  !insertmacro CheckClosed
-  SetOutPath "$INSTDIR"
+Section "Run"
+  InitPluginsDir
+  SetOutPath "$PLUGINSDIR\app"
+  ClearErrors
   File /r "${STAGE}\*"
-  WriteUninstaller "$INSTDIR\Uninstall.exe"
-  CreateDirectory "$SMPROGRAMS\LLamaLauncher"
-  CreateShortcut "$SMPROGRAMS\LLamaLauncher\LLamaLauncher.lnk" "$INSTDIR\llama-server-configurator.exe"
-  CreateShortcut "$DESKTOP\LLamaLauncher.lnk" "$INSTDIR\llama-server-configurator.exe"
-  WriteRegStr HKCU "Software\LLamaLauncher" "InstallDir" "$INSTDIR"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "DisplayName" "LLamaLauncher"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "DisplayVersion" "${VERSION}"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "DisplayIcon" "$INSTDIR\llama-server-configurator.exe"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "UninstallString" '"$INSTDIR\Uninstall.exe"'
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "QuietUninstallString" '"$INSTDIR\Uninstall.exe" /S'
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "NoModify" 1
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher" "NoRepair" 1
-SectionEnd
-
-Section "Uninstall"
-  !insertmacro CheckClosed
-  SetShellVarContext current
-  ; Exact packaged files only. No recursive directory deletion, and never data.
-  !include "${OWNED_FILES}"
-  Delete "$INSTDIR\Uninstall.exe"
-  RMDir "$INSTDIR"
-  Delete "$SMPROGRAMS\LLamaLauncher\LLamaLauncher.lnk"
-  RMDir "$SMPROGRAMS\LLamaLauncher"
-  Delete "$DESKTOP\LLamaLauncher.lnk"
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LLamaLauncher"
-  DeleteRegKey HKCU "Software\LLamaLauncher"
+  ${If} ${Errors}
+    MessageBox MB_ICONSTOP "Could not unpack LLamaLauncher's runtime. Check free space in your temporary folder."
+    SetErrorLevel 3
+    Quit
+  ${EndIf}
+  ; Storage resolves from the downloaded EXE, rather than its temporary copy.
+  ; No registration, shortcuts, system runtime or persistent app extraction.
+  System::Call 'kernel32::SetEnvironmentVariableW(w "LLAMA_LAUNCHER_PORTABLE_EXE", w "$EXEPATH") i .r0'
+  ${If} $0 == 0
+    SetErrorLevel 4
+    Quit
+  ${EndIf}
+  run_gui:
+    ClearErrors
+    ExecWait '"$PLUGINSDIR\app\llama-server-configurator.exe"' $0
+    ${If} ${Errors}
+      MessageBox MB_ICONSTOP "Could not start LLamaLauncher."
+      SetErrorLevel 5
+      Quit
+    ${EndIf}
+    ; Saved-data recovery asks the container to restart the GUI, keeping the
+    ; runtime alive until the replacement GUI has also exited.
+    ${If} $0 == 75
+      Goto run_gui
+    ${EndIf}
+  SetErrorLevel $0
+  ; NSIS cleans only its unique $PLUGINSDIR after the GUI exits.
 SectionEnd

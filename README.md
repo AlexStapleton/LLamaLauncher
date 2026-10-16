@@ -1,6 +1,6 @@
 # LLamaLauncher
 
-A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Windows and Linux builds passed native GitHub Actions validation for 1.1. Release 1.1.2 switches downloads to a Windows setup executable and Linux AppImage.
+A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Current source packages provide one portable Windows executable and one Linux AppImage. Published 1.1.2 downloads still use the earlier Windows setup format.
 
 Version 1.1.2 packaging notes and download instructions are in [RELEASE_NOTES_1.1.2.md](RELEASE_NOTES_1.1.2.md). Publication is gated on both platform jobs; packages include checksums and dependency notices. Windows packages remain unsigned beta builds.
 
@@ -27,7 +27,7 @@ Version 1.1.2 packaging notes and download instructions are in [RELEASE_NOTES_1.
 - Bounded rotating logs, a two-worker download queue, aggregated progress, and recoverable runtime installation receipts.
 - Router monitoring includes model workers/helpers; benchmark memory figures are sampled peaks.
 
-See [portable release packaging](PORTABLE_RELEASES.md) for the Windows setup `.exe` and Linux `.AppImage`. Models are not bundled. Windows packages contain a private fixed WebView2 runtime; llama.cpp is selected or downloaded during Launch setup. Current source builds target Debian 13/glibc 2.41 or newer, with clean Debian 13 and Ubuntu 26.04 AppImage startup checks without system WebKitGTK. Published 1.1.2 assets retain their original baseline.
+See [portable release packaging](PORTABLE_RELEASES.md) for the Windows portable `.exe` and Linux `.AppImage`. Models are not bundled. Windows packages contain a private fixed WebView2 runtime; llama.cpp is selected or downloaded during Launch setup. Current source builds target Debian 13/glibc 2.41 or newer, with clean Debian 13 and Ubuntu 26.04 AppImage startup checks without system WebKitGTK. Published 1.1.2 assets retain their original baseline.
 
 See [optimization implementation and measurements](OPTIMIZATION_IMPLEMENTATION.md) for the changes, measured tradeoffs and remaining Linux verification.
 
@@ -35,7 +35,7 @@ For the current fixes and validation, read the [production readiness review](PRO
 
 ## Download and run
 
-Use the latest release's **Windows-x86_64-Setup.exe** on Windows. It installs for the current account, adds desktop/Start menu shortcuts, and includes WebView2 and VC runtime DLLs. The default folder is `%LOCALAPPDATA%\Programs\LLamaLauncher`; profiles and downloaded engines/models remain in its `data` folder. Updates and uninstall preserve that folder. To use an existing portable installation, close it first and choose its folder in setup, or copy its protected `data` folder to the new installation while closed (same Windows account).
+Current source builds produce **LLamaLauncher-<version>-Windows-x86_64.exe**. Put it in a writable folder and double-click to open the GUI directly. There is no setup wizard, installation registration or automatic shortcut creation. The EXE embeds WebView2, VC DLLs, notices and documentation; runtime files unpack into a unique temporary folder for the session and are cleaned on normal exit. This adds startup extraction time and temporary disk usage. Profiles, settings, engines and default model downloads stay in **data beside the original EXE**. To update, close the app and replace the EXE while keeping `data`; to move it, move both together (same Windows account for protected credentials). Earlier published `-Setup.exe` assets are installers and remain unchanged.
 
 On Linux, download **Linux-x86_64.AppImage**, place it in a writable folder and run:
 

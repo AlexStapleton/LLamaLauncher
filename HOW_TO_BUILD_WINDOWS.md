@@ -7,7 +7,7 @@ Use the Rust/Tauri application in `tauri-app`. These instructions also apply to 
 - Node.js 26.12.0 and bundled npm 11.20.0, matching `.nvmrc` and CI.
 - Rust 1.89 or later, using the stable Windows MSVC toolchain.
 - Visual Studio C++ Build Tools, the desktop C++ workload and Windows SDK.
-- WebView2 Runtime for an ordinary executable build, or the official Fixed Version x64 runtime for a setup EXE.
+- WebView2 Runtime for an ordinary executable build, or the official Fixed Version x64 runtime for the self-contained portable EXE.
 
 Check the selected toolchain:
 
@@ -65,15 +65,15 @@ After editing option placement or descriptions, run `node tests/generate-setting
 
 Windows validation passed real inference, two-model router accounting, monitoring off, runtime install failure/retry, repeated start/stop and folder relocation. Opening the GUI alone does not prove inference works. No MCP tools are executed by verification.
 
-## Setup executable
+## Single portable executable
 
-Install NSIS 3 first (makensis.exe). From `tauri-app`, supply the extracted official x64 Fixed Version WebView2 folder:
+Install NSIS 3.13 first (makensis.exe). From `tauri-app`, package the already-built native release with verified Microsoft inputs:
 
 ```powershell
-.\package-windows.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
+.\release-windows.ps1
 ```
 
-The setup packager writes `artifacts/release/LLamaLauncher-<version>-Windows-x86_64-Setup.exe`. It installs per user to a writable folder, adds shortcuts, and keeps `data` during updates/uninstall. It includes the EXE, Fixed WebView2, licensed VC runtime DLLs, dependency notices and checksums. Engines, models and private data are excluded. For an already verified binary, `-SkipBuild -ExecutablePath 'target/release/llama-server-configurator.exe'` avoids replacing an open desktop copy. Read [PORTABLE_RELEASES.md](PORTABLE_RELEASES.md) for inputs, signing policy and clean-machine requirements.
+Build the native release first. The recipe downloads and verifies the pinned Microsoft inputs, then writes `artifacts/release/LLamaLauncher-<version>-Windows-x86_64.exe` and its checksum. Double-clicking opens the GUI directly: no setup, registration or automatic shortcuts. The container temporarily extracts the application, Fixed WebView2, licensed VC DLLs, notices and documentation, waits for the GUI and cleans its runtime on normal exit. Engines, models and private data are excluded. Settings and downloads stay in `data` beside the original EXE. For manually prepared verified inputs, use `package-windows.ps1 -FixedWebView2Directory <folder> -VCRuntimeDirectory <folder> -SkipBuild -ExecutablePath 'target/release/llama-server-configurator.exe'`, followed by `tests/windows-portable-smoke.ps1 -ExecutablePath <output>`. Read [PORTABLE_RELEASES.md](PORTABLE_RELEASES.md) for inputs and clean-machine requirements.
 
 ## Common failures
 

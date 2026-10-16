@@ -1,4 +1,4 @@
-name: Windows setup EXE and Linux AppImage
+name: Windows portable EXE and Linux AppImage
 on:
   workflow_dispatch:
 permissions:
@@ -37,7 +37,7 @@ jobs:
           sh /tmp/llamalauncher-rustup.sh -y --profile minimal --default-toolchain stable
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           "$HOME/.cargo/bin/rustup" component add rustfmt clippy
-      - name: Windows toolchain and installer compiler
+      - name: Windows toolchain and portable container compiler
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -46,7 +46,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - name: Windows build and setup
+      - name: Windows build and portable EXE
         if: runner.os == 'Windows'
         shell: pwsh
         run: |

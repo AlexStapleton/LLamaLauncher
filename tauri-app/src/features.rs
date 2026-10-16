@@ -91,6 +91,12 @@ pub async fn storage_recover(
             .client
             .take();
         drop(client);
+        #[cfg(windows)]
+        if crate::storage::portable_executable().is_some() {
+            // Keep the container's runtime alive until the replacement GUI exits.
+            app.exit(75);
+            return Ok(());
+        }
         app.restart()
     })
     .await

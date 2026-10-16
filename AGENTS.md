@@ -41,7 +41,7 @@ Publishing commits or pull requests must follow the user's authorization. The in
 - Portable packaging scripts preserve the protected Tauri config. Fixed WebView2 and VC redistributables are release inputs; llama.cpp is downloaded during Launch setup or imported from existing files; never package private user data or model weights.
 - `tests/native-features.mjs` is opt-in: it downloads a small public model, uses isolated user data, and verifies real CPU inference/router/benchmark behavior. Supply `LLAMA_LAUNCHER_EXE`, `LLAMA_SERVER_EXE` and optionally `LLAMA_FIXED_WEBVIEW`. Browser mock checks do not prove native behavior.
 
-## Portable storage and installer channels
+## Portable storage and runtime channels
 
 - All managed state is in data beside the executable; AppImage uses the original image's directory, not its temporary mount. LLAMA_LAUNCHER_DATA_DIR is an explicit test override.
 - Preserve private file protection and relative references to managed paths. Copy legacy native records without deleting the originals; never copy developer data into packages.
@@ -51,8 +51,8 @@ Publishing commits or pull requests must follow the user's authorization. The in
 
 ## Public packaging (1.1.1+)
 
-- Publish Windows NSIS setup EXE and Linux AppImage, not raw executable ZIPs. Preserve previous release tags/assets.
-- `package-windows.ps1` stages known files and compiles `installer/windows.nsi`. Never package data or fixtures. Uninstall deletes only exact packaged paths and preserves data/unrecognized files. Installation is per user so adjacent data stays writable. Installer smoke runs only on an isolated CI runner.
+- The user requires one portable Windows EXE and one Linux AppImage, without setup or ZIP extraction. Preserve previous release tags/assets.
+- `package-windows.ps1` stages known files and compiles `installer/windows.nsi` as a silent portable container, not an installer. Never package data/fixtures, register uninstall keys or create shortcuts. Extract only into NSIS's unique temporary directory, wait for the GUI before cleanup, and resolve data beside `LLAMA_LAUNCHER_PORTABLE_EXE`. Saved-data recovery exits with code 75 so the container restarts the GUI before deleting its runtime. Run `tests/windows-portable-smoke.ps1` against the final EXE.
 - `package-appimage.sh` invokes the locked @tauri-apps/cli 2.x using an ignored configuration override; do not change tauri.conf.json. `release-linux.sh` verifies bundled WebKitGTK/helpers and requires Docker clean-host startup without WebKitGTK installed.
 - The native 1.1 Windows/Linux workflow completed successfully; older review statements about unexecuted Linux are historical. Do not claim broader AppImage/hardware/clean-machine checks passed without their own evidence.
 

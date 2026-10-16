@@ -25,7 +25,7 @@ for(const platform of ['Windows','Linux']){
   const folder=path.resolve(`release-publish/${platform}`);fs.mkdirSync(folder,{recursive:true});const archive=path.join(folder,'artifact.zip');
   const response=await fetch(`https://api.github.com/repos/${repository}/actions/artifacts/${artifact.id}/zip`,{headers});if(!response.ok||!response.body)throw Error('Cannot download verified workflow artifact');
   await pipeline(Readable.fromWeb(response.body),fs.createWriteStream(archive));
-  const name=platform==='Windows'?`LLamaLauncher-${tag}-Windows-x86_64-Setup.exe`:`LLamaLauncher-${tag}-Linux-x86_64.AppImage`,allowed=new Set([name,name+'.sha256']);
+  const name=platform==='Windows'?`LLamaLauncher-${tag}-Windows-x86_64.exe`:`LLamaLauncher-${tag}-Linux-x86_64.AppImage`,allowed=new Set([name,name+'.sha256']);
   const entries=execFileSync('unzip',['-Z','-1',archive],{encoding:'utf8'}).trim().split(/\r?\n/);if(entries.length!==2||entries.some(e=>!allowed.has(e)))throw Error('Unexpected release artifact entries');
   execFileSync('unzip',['-o',archive,'-d',folder],{stdio:'ignore'});
   const zip=path.join(folder,name),digest=await hash(zip),checksum=fs.readFileSync(zip+'.sha256','utf8').replace(/^\uFEFF/,'').trim();

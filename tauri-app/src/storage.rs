@@ -73,6 +73,12 @@ fn legacy_profile_path() -> PathBuf {
     }
 }
 pub fn executable_directory() -> PathBuf {
+    #[cfg(windows)]
+    if let Some(executable) = portable_executable() {
+        if let Some(parent) = executable.parent() {
+            return parent.into();
+        }
+    }
     #[cfg(unix)]
     if let Some(image) = std::env::var_os("APPIMAGE").map(PathBuf::from) {
         if image.is_absolute() {
@@ -85,6 +91,12 @@ pub fn executable_directory() -> PathBuf {
         .ok()
         .and_then(|p| p.parent().map(Path::to_path_buf))
         .unwrap_or_else(|| PathBuf::from("."))
+}
+#[cfg(windows)]
+pub fn portable_executable() -> Option<PathBuf> {
+    std::env::var_os("LLAMA_LAUNCHER_PORTABLE_EXE")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute() && path.is_file())
 }
 fn profile_path() -> PathBuf {
     let root = std::env::var_os("LLAMA_LAUNCHER_DATA_DIR")

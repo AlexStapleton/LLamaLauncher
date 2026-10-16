@@ -23,21 +23,10 @@ try {
     if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
     $outputFolder=Join-Path $PSScriptRoot 'artifacts/release'
     New-Item -ItemType Directory -Path $outputFolder -Force | Out-Null
-    $output=Join-Path $outputFolder "LLamaLauncher-$version-Windows-x86_64-Setup.exe"
-    $owned=Join-Path (Split-Path $stage -Parent) 'owned-files.nsh'
-    function Escape-Nsis([string]$value) { return $value.Replace('$','$$').Replace('"','$\"') }
-    $lines=@(Get-ChildItem -LiteralPath $stage -File -Recurse | ForEach-Object {
-        $relative=$_.FullName.Substring($stage.Length+1)
-        if ($relative -match '^(data|test-legacy-context)(\\|$)' -or $relative.Contains('..')) { throw 'Unexpected package path' }
-        'Delete "$INSTDIR\'+(Escape-Nsis $relative)+'"'
-    })
-    $lines+=@(Get-ChildItem -LiteralPath $stage -Directory -Recurse | Sort-Object { $_.FullName.Length } -Descending | ForEach-Object {
-        'RMDir "$INSTDIR\'+(Escape-Nsis $_.FullName.Substring($stage.Length+1))+'"'
-    })
-    $lines | Set-Content -LiteralPath $owned -Encoding utf8
+    $output=Join-Path $outputFolder "LLamaLauncher-$version-Windows-x86_64.exe"
     $icon=(Resolve-Path icons/icon.ico).Path
-    & $MakeNsis /V2 /WX "/DSTAGE=$stage" "/DOUTPUT=$output" "/DVERSION=$version" "/DOWNED_FILES=$owned" "/DICON=$icon" installer/windows.nsi
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $output)) { throw 'NSIS setup build failed' }
+    & $MakeNsis /V2 /WX "/DSTAGE=$stage" "/DOUTPUT=$output" "/DVERSION=$version" "/DICON=$icon" installer/windows.nsi
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $output)) { throw 'Portable executable build failed' }
     "$((Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLower())  $(Split-Path $output -Leaf)" | Set-Content -LiteralPath "$output.sha256" -Encoding utf8
-    Write-Output "Windows setup: $output"
+    Write-Output "Portable Windows executable: $output"
 } finally { Pop-Location }

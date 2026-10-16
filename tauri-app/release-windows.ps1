@@ -22,6 +22,6 @@ try {
     if($crtLine.Count -ne 1){throw 'Expected one verified VC runtime stage'}
     $crt=$crtLine[0].Substring('VCRUNTIME_STAGE='.Length)
     & ./package-windows.ps1 -FixedWebView2Directory $webview.DirectoryName -VCRuntimeDirectory $crt -ExecutablePath target/release/llama-server-configurator.exe -SkipBuild
-    if($LASTEXITCODE -ne 0){throw 'Windows installer packaging failed'}
-    & ./tests/windows-installer-smoke.ps1 -InstallerPath artifacts/release/LLamaLauncher-1.1.2-Windows-x86_64-Setup.exe
+    if($LASTEXITCODE -ne 0){throw 'Windows portable packaging failed'}
+    & ./tests/windows-portable-smoke.ps1 -ExecutablePath "artifacts/release/LLamaLauncher-$releaseVersion-Windows-x86_64.exe"
 } finally { Pop-Location }
