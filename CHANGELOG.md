@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Follow XDG config/data/state/cache locations on Linux. Default GGUF downloads use the configured desktop Downloads directory; downloaded llama.cpp runtimes use application data. Preserve existing folder choices, import bounded old metadata/backups, retain original model/runtime files and treat retained runtimes as external imports.
+- Use the desktop system font, readable relative type sizes and layout rows that grow with text. Add a saved 90–200% Text size control and verify the main sections at large sizes and smaller window widths.
+- Send recovery record names as strings so the recovery UI can restore damaged records, including after Linux storage migration.
+- Package Windows as a single portable EXE with its GUI runtime embedded, normal-exit temporary cleanup and recovery restart support. Offer direct EXE/AppImage test downloads without ZIP wrapping. Published 1.1.2 installers remain unchanged.
+- Refresh compatible dependencies, build tools and verified Microsoft runtimes; target Debian 13/glibc 2.41 for new Linux packages. See the dependency review for pins and retained framework constraints.
+
 ## 1.1.2 — 2026-10-16
 
 - Correct the quoted Windows Installed apps uninstall command, register silent uninstall, and validate the real registry values on fresh install and upgrade. Exercise the registered uninstaller and preserve user data. Treat NSIS compiler warnings as errors.
