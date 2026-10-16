@@ -1,6 +1,10 @@
 # Linux dependency review — 2026-10-16
 
-## Migration implementation
+## Current unreleased baseline: Debian 13
+
+The user selected Debian 13 and newer distributions during the full dependency pass. Source builds now run inside Debian 13 with glibc 2.41, WebKitGTK >=2.54.0 and OpenSSL >=3.5.7. Ubuntu 24.04 remains only the GitHub Docker host. Clean startup targets Debian 13 and Ubuntu 26.04 without installed WebKitGTK/FUSE; the compatibility job is separate from the build container and is required before publication. This does not replace existing 1.1.2 assets or change their glibc 2.39 baseline. Current source/package evidence and remaining upstream-vs-distro gaps are in [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md).
+
+## Migration implementation (published 1.1.2 history)
 
 The user selected modernization before publication. Source is migrated to stable Tauri 2.12.4, Wry 0.57.0, Rust WebKitGTK binding 2.0.2 and soup3 0.5.0, JavaScript API 2.12.4 and CLI 2.12.3. These are Rust/npm package versions, not native engine versions. The Linux build baseline is Ubuntu 24.04 (glibc 2.39), using apt updates/security packages. Publication requires WebKitGTK engine 2.52.6 or newer, records exact native package versions and rejects bundled WebKitGTK 4.0/libsoup 2. Tauri 2 still uses GTK 3 and GLib Rust binding 0.18.5; the iterator fix is carried forward in a fresh verified 0.18.5 source backport, replacing the 0.15 fork. The yanked zip 2.4.2 archive dependency is replaced by current zip 9.0.4; archive containment/link/size tests remain required. Native Windows/Linux and clean-host package validation must pass before publication.
 
@@ -58,4 +62,4 @@ Release 1.1.1 passed Windows/Linux CI and was published from `9d3d2871cec51c80cb
 
 ## Subsequent dependency pass
 
-See [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md) for the full Rust/npm/native/build-tool inventory and explicit native servicing gaps. The Ubuntu 24.04 baseline is retained pending the Linux compatibility choice; upstream WebKitGTK 2.54.1 and newer native library lines are not claimed to be present. Clean-host validation now also includes Debian 13. Refer to actual CI execution evidence in the dependency review before claiming that new check passed.
+See [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md) for the full Rust/npm/native/build-tool inventory. The selected build baseline is now Debian 13/glibc 2.41, with its security/updates repositories; this is newer than the published 1.1.2 baseline but still distinct from newest upstream releases. Refer to actual CI execution evidence before claiming the new container/build checks passed.

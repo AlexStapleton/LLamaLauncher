@@ -7,7 +7,7 @@ mkdir -p artifacts
 : > artifacts/appimage-clean-host.log
 # Fresh userspaces have no WebKitGTK installed. Do not mount the build host's
 # libraries, models or credentials. Extraction mode also tests FUSE-free startup.
-for distro in ubuntu:24.04 debian:13; do
+for distro in debian:13 ubuntu:26.04; do
 docker run --rm -v "$image:/input/LLamaLauncher.AppImage:ro" \
   -v "$(realpath tests/linux-window-smoke.sh):/input/window-smoke.sh:ro" \
   "$distro" bash -euo pipefail -c '

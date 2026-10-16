@@ -56,12 +56,12 @@ Publishing commits or pull requests must follow the user's authorization. The in
 - `package-appimage.sh` invokes the locked @tauri-apps/cli 2.x using an ignored configuration override; do not change tauri.conf.json. `release-linux.sh` verifies bundled WebKitGTK/helpers and requires Docker clean-host startup without WebKitGTK installed.
 - The native 1.1 Windows/Linux workflow completed successfully; older review statements about unexecuted Linux are historical. Do not claim broader AppImage/hardware/clean-machine checks passed without their own evidence.
 
-- The user explicitly authorized the Tauri 2 migration for 1.1.1. The configuration is now schema 2; preserve its CSP and local main-window event capabilities. Do not reapply old Tauri 1 instructions. Linux uses WebKitGTK 4.1/libsoup 3 on Ubuntu 24.04. `tests/linux-package-inventory.mjs` gates the engine version and records the actual native package versions.
+- The user explicitly authorized the Tauri 2 migration for 1.1.1 and selected Debian 13/newer as the current Linux target. The configuration is schema 2; preserve its CSP and local main-window event capabilities. Do not reapply old Tauri 1 instructions. Linux uses WebKitGTK 4.1/libsoup 3 on Debian 13. `tests/linux-package-inventory.mjs` gates WebKitGTK >=2.54.0, OpenSSL >=3.5.7 and glibc >=2.41, and records actual native package versions.
 
 ## Dependency policy
 
 - Latest compatible stable is the default. See `DEPENDENCY_REVIEW.md` and the generated `DEPENDENCY_INVENTORY.json`/`.md`; do not claim a zero advisory count means every dependency is current.
 - Regenerate Cargo/npm locks through their package managers. Review major API changes; never force incompatible indirect versions globally to silence an outdated report.
 - `runtime-inputs.json` pins official Microsoft Fixed WebView2 and VC runtime downloads by immutable URL/hash. Verify publisher signatures, exact versions and x64 architecture. The VC recipe only extracts app-local DLLs; never install a system redistributable on the user's computer for packaging.
-- Preserve the existing Linux baseline until its compatibility target is explicitly changed. Clean AppImage checks cover Ubuntu 24.04 and Debian 13 without system WebKitGTK/FUSE. Native distro library servicing gaps are documented separately from Rust/npm advisories.
+- The current build baseline is Debian 13/glibc 2.41, explicitly chosen by the user. Clean AppImage checks cover Debian 13 and Ubuntu 26.04 without system WebKitGTK/FUSE. Ubuntu 24.04 is a CI Docker host, not the new binary compatibility target. Existing 1.1.2 assets keep their older baseline. Native distro servicing gaps remain distinct from Rust/npm advisories.
 - Ordinary main-branch dependency updates also build/test packages. Existing published release assets/tags remain immutable; packaging validation does not authorize republishing an existing version.

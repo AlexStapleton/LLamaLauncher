@@ -27,7 +27,7 @@ Version 1.1.2 packaging notes and download instructions are in [RELEASE_NOTES_1.
 - Bounded rotating logs, a two-worker download queue, aggregated progress, and recoverable runtime installation receipts.
 - Router monitoring includes model workers/helpers; benchmark memory figures are sampled peaks.
 
-See [portable release packaging](PORTABLE_RELEASES.md) for the Windows setup `.exe` and Linux `.AppImage`. Models are not bundled. Windows packages contain a private fixed WebView2 runtime; llama.cpp is selected or downloaded during Launch setup. AppImage publication requires a clean Ubuntu 24.04 container startup check without system WebKitGTK.
+See [portable release packaging](PORTABLE_RELEASES.md) for the Windows setup `.exe` and Linux `.AppImage`. Models are not bundled. Windows packages contain a private fixed WebView2 runtime; llama.cpp is selected or downloaded during Launch setup. Current source builds target Debian 13/glibc 2.41 or newer, with clean Debian 13 and Ubuntu 26.04 AppImage startup checks without system WebKitGTK. Published 1.1.2 assets retain their original baseline.
 
 See [optimization implementation and measurements](OPTIMIZATION_IMPLEMENTATION.md) for the changes, measured tradeoffs and remaining Linux verification.
 
@@ -60,7 +60,7 @@ Run `tauri-app/desktop-app/llama-server-configurator.exe`. The frontend is embed
 
 ## Build on Linux
 
-For an Ubuntu 24.04-based environment, install the Tauri 2 system dependencies:
+For current source builds, use Debian 13 and install the Tauri 2 system dependencies:
 
 ```sh
 sudo apt-get install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev patchelf

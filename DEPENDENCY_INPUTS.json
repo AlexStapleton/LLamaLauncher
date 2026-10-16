@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-16T19:15:50.378Z",
+  "checkedAt": "2026-10-16T19:24:57.635Z",
   "node": {
     "pinned": "26.12.0",
     "latest": "26.12.0",
@@ -18,10 +18,10 @@
     "source": "https://nsis-dev.github.io/release-data/versions.json"
   },
   "webkit": {
-    "reviewedBuildBaseline": "2.52.6",
+    "reviewedBuildBaseline": "2.54.0",
     "latestStable": "2.54.1",
     "source": "https://webkitgtk.org/",
-    "exception": "Ubuntu 24.04 binary compatibility; this older distro engine is a servicing gap, not proof of upstream currency or security."
+    "exception": "Debian 13 security/updates package line; 2.54.1 is newer upstream. Record exact vendor patches and review native advisory coverage instead of claiming all upstream fixes are present."
   },
   "cargoAudit": {
     "pinned": "0.22.2",
