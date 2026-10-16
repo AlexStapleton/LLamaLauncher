@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-const root=path.resolve(import.meta.dirname,'../../vendor/glib-0.15.12');
+const root=path.resolve(import.meta.dirname,'../../vendor/glib-0.18.5');
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'UPSTREAM_SHA256.json'),'utf8'));
 for(const [name,digest] of Object.entries(manifest.files)){
   const actual=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,name))).digest('hex');

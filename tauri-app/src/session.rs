@@ -2,6 +2,7 @@
 use crate::{config::Config, server};
 use serde_json::{json, Value};
 use std::{sync::atomic::AtomicBool, time::Duration};
+use tauri::Emitter;
 #[cfg(unix)]
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 #[derive(Clone)]
@@ -405,7 +406,6 @@ pub async fn cancelled(cancel: &AtomicBool) {
 /// Router event support is probed by opening its advertised endpoint. Older
 /// runtimes fall back to the UI's bounded five-second model-state poll.
 pub fn watch_router(app: tauri::AppHandle, state: server::State) {
-    use tauri::Manager;
     tauri::async_runtime::spawn(async move {
         loop {
             if state.0.lock().map_or(true, |m| m.shutdown) {
@@ -432,7 +432,7 @@ pub fn watch_router(app: tauri::AppHandle, state: server::State) {
                     )
                     .await
                     .map_err(|_| "Router event timeout")??;
-                    let _ = app.emit_all("router-events", json!({"connected":true}));
+                    let _ = app.emit("router-events", json!({"connected":true}));
                     let mut buffer = Vec::new();
                     while let Some(chunk) =
                         fresh_router_chunk(&mut body, Duration::from_secs(20)).await?
@@ -448,7 +448,7 @@ pub fn watch_router(app: tauri::AppHandle, state: server::State) {
                                 .trim();
                             if let Some(data) = line.strip_prefix("data:") {
                                 if let Ok(event) = serde_json::from_str::<Value>(data.trim()) {
-                                    let _=app.emit_all("router-change",json!({"model":event["model"],"event":event["event"],"status":event["data"]["status"]}));
+                                    let _=app.emit("router-change",json!({"model":event["model"],"event":event["event"],"status":event["data"]["status"]}));
                                 }
                             }
                         }
@@ -456,7 +456,7 @@ pub fn watch_router(app: tauri::AppHandle, state: server::State) {
                     Ok::<(), String>(())
                 };
                 tokio::select! {_=stale=>{},_=stream=>{}}
-                let _ = app.emit_all("router-events", json!({"connected":false}));
+                let _ = app.emit("router-events", json!({"connected":false}));
             }
             tokio::time::sleep(Duration::from_secs(5)).await;
         }

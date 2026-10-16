@@ -12,7 +12,7 @@ const legacy=path.join(fixture,'legacy');fs.mkdirSync(legacy,{recursive:true});
 let browser,child,page;
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn){const end=Date.now()+30000;while(Date.now()<end){try{const r=await fn();if(r)return r;}catch{}await delay(200);}throw new Error('Portable app did not become ready');}
-async function call(command,args={}){return page.evaluate(({command,args})=>window.__TAURI_INVOKE__(command,args),{command,args});}
+async function call(command,args={}){return page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});}
 async function stop(){await browser?.close().catch(()=>{});child?.kill();await delay(500);browser=null;child=null;}
 async function launch(folder){
   fs.mkdirSync(folder,{recursive:true});const exe=path.join(folder,'LLamaLauncher.exe');fs.copyFileSync(source,exe);

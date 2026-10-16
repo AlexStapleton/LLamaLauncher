@@ -1,5 +1,6 @@
 //! Native commands for hardware, model hub and managed jobs.
 use crate::{config::Config, downloads, hub, jobs, monitor, registry, server, session};
+use tauri::Emitter;
 
 use serde_json::{json, Value};
 
@@ -90,8 +91,7 @@ pub async fn storage_recover(
             .client
             .take();
         drop(client);
-        app.restart();
-        Ok::<_, String>(())
+        app.restart()
     })
     .await
     .map_err(|_| "Recovery worker failed".to_string())?
@@ -102,7 +102,7 @@ pub fn close_ready(state: State<'_, crate::CloseGuard>) {
 }
 #[tauri::command]
 pub fn finish_close(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     state: State<'_, crate::CloseGuard>,
 ) -> Result<(), String> {
     state.allow.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -361,7 +361,7 @@ pub fn inference_test(
 
     tauri::async_runtime::spawn(async move {
         let result = session::completion(&s, &prompt, &model, max_tokens, &cancel, |text| {
-            let _ = app.emit_all(
+            let _ = app.emit(
                 "inference-delta",
                 json!({
                 "id":job_id,"text":text}
@@ -1015,7 +1015,7 @@ mod review_tests {
 #[tauri::command]
 pub async fn results_export(result: Value, csv: bool) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move||{
-let dialog=tauri::api::dialog::blocking::FileDialogBuilder::new().set_title("Export benchmark results").set_file_name(if csv{
+let dialog=rfd::FileDialog::new().set_title("Export benchmark results").set_file_name(if csv{
 "benchmark.csv"}
 else{
 "benchmark.json"}

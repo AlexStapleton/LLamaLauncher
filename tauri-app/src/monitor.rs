@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 
 use serde_json::{json, Value};
 
 use std::sync::{Arc, Mutex};
 
 use sysinfo::{Pid, ProcessesToUpdate, System};
-
-use tauri::Manager;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MonitoringPreferences {
@@ -321,7 +320,7 @@ pub async fn adapters() -> Vec<Value> {
 
 pub fn start(app: tauri::AppHandle, state: State, server: crate::server::State) {
     tauri::async_runtime::spawn(run(state, server, move |sample| {
-        let _ = app.emit_all("launcher-telemetry", sample);
+        let _ = app.emit("launcher-telemetry", sample);
     }));
 }
 

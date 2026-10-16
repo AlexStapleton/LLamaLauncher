@@ -1,3 +1,4 @@
+import { invoke as nativeInvoke } from '@tauri-apps/api/core';
 import type { Config, Profile, Report, Heartbeat, ModelInfo, PlatformInfo, LaunchProfile, ProfileSummary, MonitoringPreferences, HardwareSnapshot, TelemetrySample, ModelMetadata, JobReport, DownloadPlan, Artifact } from './native-types';
 interface Commands {
   open_llama_documentation: [{url:string},void];
@@ -69,11 +70,6 @@ interface Commands {
   mcp_disconnect: [undefined, void];
   mcp_status: [undefined, Heartbeat];
 }
-declare global {
-  interface Window {
-    __TAURI_INVOKE__: (command: string, args?: unknown) => Promise<unknown>;
-  }
-}
 export async function invoke<K extends keyof Commands>(command: K, ...args: Commands[K][0] extends undefined ? [] : [Commands[K][0]]): Promise<Commands[K][1]> {
-  return await window.__TAURI_INVOKE__(command, args[0]) as Commands[K][1];
+  return await nativeInvoke(command, args[0] as Record<string, unknown> | undefined) as Commands[K][1];
 }

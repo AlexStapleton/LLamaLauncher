@@ -81,9 +81,9 @@ The setup packager writes `artifacts/release/LLamaLauncher-<version>-Windows-x86
 |---|---|
 | Missing dlltool / import-library error | Select the MSVC toolchain explicitly. |
 | EXE access denied during copy/build | Close that copy after coordinating its owned server; distinguish filesystem sandbox restrictions from source errors. |
-| Tauri dependency features disagree with allowlist | Preserve Tauri 1 configuration and security policy. Do not restore broad api-all/plugin features blindly. |
+| Tauri dependency features disagree with allowlist | Preserve the Tauri 2 CSP and least-privilege capabilities. Do not restore Tauri 1 allowlist features. |
 | Old frontend / missing index.html | Run npm build from tauri-app; Vite's root is src/frontend and its output is tauri-app/dist. |
 | Lockfile needs updating | Regenerate through Cargo only for an intentional dependency change; repeat verification afterward. |
 | Save or recovery error | Launch → Saved data & recovery; retain data and protected originals rather than deleting them to make launch succeed. |
 
-The app remains Tauri 1. Manual EXE builds do not require the Tauri CLI; AppImage packaging requires a compatible 1.x CLI. Do not edit protected tauri.conf.json, generated dist/target/node_modules, or deprecated code.
+The app uses Tauri 2. Manual EXE builds do not require the Tauri CLI; AppImage packaging uses the locked 2.x CLI installed by npm ci. Do not edit protected tauri.conf.json, generated dist/target/node_modules, or deprecated code.

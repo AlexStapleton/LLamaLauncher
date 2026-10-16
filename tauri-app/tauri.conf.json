@@ -1,15 +1,16 @@
 {
-  "$schema": "https://schema.tauri.app/config/1.8",
-  "package": {
-    "productName": "llama-server-configurator"
-  },
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LLamaLauncher",
+  "mainBinaryName": "llama-server-configurator",
+  "version": "1.1.1",
+  "identifier": "io.github.alexstapleton.llamalauncher",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "",
-    "devPath": "http://localhost:14200",
-    "distDir": "dist"
+    "devUrl": "http://localhost:14200",
+    "frontendDist": "dist"
   },
-  "tauri": {
+  "app": {
     "windows": [
       {
         "title": "Llama Server Configuration Manager",
@@ -17,11 +18,19 @@
         "height": 700,
         "resizable": true,
         "fullscreen": false,
-        "decorations": true
+        "decorations": true,
+        "label": "main"
       }
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'; connect-src 'self'; media-src 'none'; object-src 'none'; worker-src 'none'; frame-ancestors 'none'"
     }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ]
   }
 }

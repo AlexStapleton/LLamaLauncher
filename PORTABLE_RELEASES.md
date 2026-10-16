@@ -2,7 +2,7 @@
 
 The public downloads are a Windows **setup `.exe`** and Linux **`.AppImage`**, plus SHA256 checksums. Windows setup includes the private x64 Fixed Version WebView2 runtime and licensed VC runtime DLLs; it installs for the current user, adds shortcuts, and preserves `data` on upgrade and uninstall. The default installation is `%LOCALAPPDATA%\Programs\LLamaLauncher`, a writable location so profiles remain beside the EXE. Close the application and stop its server before updating. Choose an existing portable folder in setup or copy its protected `data` folder while closed to retain it; Windows credentials require the same Windows account.
 
-The AppImage bundles WebKitGTK and its process helpers; it does not require `libwebkit2gtk-4.0.so.37` from the host. Put it in a writable folder, `chmod +x` it and run it. Use `--appimage-extract-and-run` without FUSE. Its managed data is beside the original AppImage, outside the temporary mount. The supported baseline is Linux x86_64, glibc 2.35+, with a desktop session; broader distribution/GPU testing remains necessary.
+The AppImage bundles WebKitGTK and its process helpers; it does not require `libwebkit2gtk-4.0.so.37` from the host. Put it in a writable folder, `chmod +x` it and run it. Use `--appimage-extract-and-run` without FUSE. Its managed data is beside the original AppImage, outside the temporary mount. The supported baseline is Linux x86_64, glibc 2.39+, with a desktop session; broader distribution/GPU testing remains necessary.
 
 llama.cpp and model weights are installed separately through Launch and Models, or linked from existing files. Distribution packages never contain developer data. Windows private records are account-bound; Linux uses private permissions. Both packaging paths retain offline settings documentation and dependency licenses.
 
@@ -14,7 +14,7 @@ Install NSIS 3 (makensis.exe). From `tauri-app` in PowerShell:
 ./package-windows.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
 ```
 
-For Ubuntu/Debian x64, build an AppImage on Ubuntu 22.04 with Node 22.12+, Rust 1.89+, Tauri 1 system development libraries and `xvfb` installed. The script invokes pinned Tauri CLI 1.6.3 through npx and creates a configuration override under ignored artifacts, preserves `tauri.conf.json`, and runs a virtual-display smoke check of the AppImage's FUSE-free startup.
+For Ubuntu/Debian x64, build an AppImage on Ubuntu 24.04 with Node 22.12+, Rust 1.89+, Tauri 2 system development libraries and `xvfb` installed. The script invokes the locked Tauri 2 CLI through npx and creates a configuration override under ignored artifacts, preserves `tauri.conf.json`, and runs a virtual-display smoke check of the AppImage's FUSE-free startup.
 
 ```bash
 bash package-appimage.sh

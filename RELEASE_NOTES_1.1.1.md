@@ -1,6 +1,6 @@
 # LLamaLauncher 1.1.1
 
-This packaging fix replaces the 1.1 ZIP downloads with a Windows setup executable and a Linux AppImage. The old Linux raw executable needed host WebKitGTK 4.0 and could fail with `libwebkit2gtk-4.0.so.37: cannot open shared object file`. The AppImage bundles WebKitGTK and its process helpers.
+This packaging fix replaces the 1.1 ZIP downloads with a Windows setup executable and a Linux AppImage. The old Linux raw executable needed host WebKitGTK 4.0 and could fail with `libwebkit2gtk-4.0.so.37: cannot open shared object file`. The application is migrated to stable Tauri 2.12.4, with current Tauri JavaScript/CLI APIs and narrowly scoped event permissions. The AppImage bundles WebKitGTK 4.1/libsoup 3 and its process helpers; the build rejects a WebKit engine older than the reviewed 2.54 stable line. The WebKit API number (4.1) is different from the engine version (2.54.x). Native package versions are recorded in LINUX_PACKAGE_VERSIONS.txt inside the image. GTK 3 remains required by Tauri. Its compatible GLib 0.18.5 Rust binding retains a verified source backport for RUSTSEC-2024-0429.
 
 ## Windows
 
@@ -15,7 +15,7 @@ chmod +x LLamaLauncher-1.1.1-Linux-x86_64.AppImage
 ./LLamaLauncher-1.1.1-Linux-x86_64.AppImage
 ```
 
-Without FUSE, run `./LLamaLauncher-1.1.1-Linux-x86_64.AppImage --appimage-extract-and-run`. No system WebKitGTK 4.0 installation is required. The baseline is Linux x86_64, glibc 2.35 or newer, with a desktop display; ARM and Alpine/musl are not supported by this asset. Keep `data` beside the AppImage when upgrading. Models and llama.cpp are downloaded separately in the application.
+Without FUSE, run `./LLamaLauncher-1.1.1-Linux-x86_64.AppImage --appimage-extract-and-run`. No system WebKitGTK 4.0 installation is required. The baseline is Linux x86_64, glibc 2.39 or newer, with a desktop display; ARM and Alpine/musl are not supported by this asset. Keep `data` beside the AppImage when upgrading. Models and llama.cpp are downloaded separately in the application.
 
 ## Validation and status
 

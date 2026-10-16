@@ -4,7 +4,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
-use tauri::Manager;
+use tauri::Emitter;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct JobReport {
@@ -62,7 +62,7 @@ impl State {
         if let Ok(mut jobs) = self.0.lock() {
             if let Some(job) = jobs.iter_mut().find(|j| j.report.id == id) {
                 update(&mut job.report);
-                let _ = app.emit_all("launcher-job", &job.report);
+                let _ = app.emit("launcher-job", &job.report);
             }
         }
     }

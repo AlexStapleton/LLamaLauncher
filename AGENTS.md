@@ -1,6 +1,6 @@
 # LLamaLauncher development
 
-The active application is `tauri-app/`: Rust/Tauri 1 with a Vite frontend. Keep changes in this repository. Do not copy back into the previous project or replace the application with placeholders.
+The active application is `tauri-app/`: Rust/Tauri 2 with a Vite frontend. Keep changes in this repository. Do not copy back into the previous project or replace the application with placeholders.
 
 - Rust entry point and configuration validation: `tauri-app/src/main.rs`.
 - MCP client/bridge: `tauri-app/src/mcp.rs`; bounded frames: `framing.rs`; private storage: `storage.rs`.
@@ -19,7 +19,7 @@ The active application is `tauri-app/`: Rust/Tauri 1 with a Vite frontend. Keep 
 - Keep the protected Tauri configuration and Cargo.lock unchanged. Build.rs rejects stale embedded frontend assets.
 - Run `cargo fmt --check`, `cargo clippy --all-targets --locked -- -D warnings`, unit/interface checks and a native release build. CI is prepared; distinguish prepared checks from remotely executed checks.
 - Windows: use `cargo +stable-x86_64-pc-windows-msvc build --release --locked`. The desktop's default GNU toolchain is missing dlltool. Do not confuse that with source failures.
-- Linux: use its native Rust toolchain and install Tauri 1 system libraries. Keep Windows-only APIs behind `#[cfg(windows)]` and Unix APIs behind `#[cfg(unix)]`.
+- Linux: use its native Rust toolchain and install Tauri 2 system libraries. Keep Windows-only APIs behind `#[cfg(windows)]` and Unix APIs behind `#[cfg(unix)]`.
 - Do not edit generated `dist`, `target`, or `node_modules`. Let Cargo regenerate the lockfile for intentional dependency changes, then use `--locked`.
 - Verify with `npm test`, `cargo test --release --locked`, and the optional Playwright interface harness. Describe headless mocked-backend checks separately from real native/MCP checks.
 - Never commit tokens, private MCP profile files, or live connection fixtures. Windows credentials use DPAPI; Linux profiles use account-only file permissions. Do not claim Linux profiles are encrypted.
@@ -53,5 +53,7 @@ Publishing commits or pull requests must follow the user's authorization. The in
 
 - Publish Windows NSIS setup EXE and Linux AppImage, not raw executable ZIPs. Preserve previous release tags/assets.
 - `package-windows.ps1` stages known files and compiles `installer/windows.nsi`. Never package data or fixtures. Uninstall deletes only exact packaged paths and preserves data/unrecognized files. Installation is per user so adjacent data stays writable. Installer smoke runs only on an isolated CI runner.
-- `package-appimage.sh` invokes pinned @tauri-apps/cli 1.6.3 using an ignored configuration override; do not change tauri.conf.json. `release-linux.sh` verifies bundled WebKitGTK/helpers and requires Docker clean-host startup without WebKitGTK installed.
+- `package-appimage.sh` invokes the locked @tauri-apps/cli 2.x using an ignored configuration override; do not change tauri.conf.json. `release-linux.sh` verifies bundled WebKitGTK/helpers and requires Docker clean-host startup without WebKitGTK installed.
 - The native 1.1 Windows/Linux workflow completed successfully; older review statements about unexecuted Linux are historical. Do not claim broader AppImage/hardware/clean-machine checks passed without their own evidence.
+
+- The user explicitly authorized the Tauri 2 migration for 1.1.1. The configuration is now schema 2; preserve its CSP and local main-window event capabilities. Do not reapply old Tauri 1 instructions. Linux uses WebKitGTK 4.1/libsoup 3 on Ubuntu 24.04. `tests/linux-package-inventory.mjs` gates the engine version and records the actual native package versions.

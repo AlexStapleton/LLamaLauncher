@@ -13,7 +13,7 @@ jobs:
         include:
           - os: windows-latest
             toolchain: stable-x86_64-pc-windows-msvc
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             toolchain: stable
     runs-on: ${{ matrix.os }}
     defaults:
@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: tauri-app/package-lock.json
       - name: Linux system libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf xvfb x11-utils
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev patchelf xvfb x11-utils
       - name: Rust toolchain
         run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component rustfmt --component clippy
       - uses: Swatinem/rust-cache@v2
@@ -39,8 +39,8 @@ jobs:
           cache-on-failure: true
       - run: npm ci
       - run: npm test
-      - run: node tests/generate-settings-guide.mjs --check
       - run: node tests/verify-glib-backport.mjs
+      - run: node tests/generate-settings-guide.mjs --check
       - run: npm run typecheck
       - run: npm run build
       - name: Rust formatting
@@ -87,6 +87,7 @@ jobs:
             tauri-app/artifacts/gui-*.png
             tauri-app/artifacts/gui-benchmark*.json
             tauri-app/artifacts/native-package-startup.json
+            tauri-app/artifacts/LINUX_PACKAGE_VERSIONS.txt
             tauri-app/artifacts/linux-window-stderr.log
             tauri-app/artifacts/appimage-clean-host.log
             tauri-app/artifacts/THIRD_PARTY_NOTICES.txt
@@ -96,7 +97,7 @@ jobs:
   release:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       actions: read

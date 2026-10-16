@@ -11,8 +11,6 @@ try {
     $webviewSource = (Resolve-Path -LiteralPath $FixedWebView2Directory).Path
     if (-not (Test-Path -LiteralPath (Join-Path $webviewSource 'msedgewebview2.exe'))) { throw 'Select the extracted x64 Fixed Version WebView2 folder from Microsoft.' }
     if (-not $SkipBuild) { & ./build-windows.ps1; if ($LASTEXITCODE -ne 0) { throw 'Build failed.' } }
-    & node tests/verify-glib-backport.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'Dependency backport verification failed.' }
     & node tests/generate-notices.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Dependency notice generation failed.' }
     & node tests/generate-settings-guide.mjs --check

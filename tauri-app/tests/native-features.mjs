@@ -18,7 +18,7 @@ delete env.LLAMA_MCP_PROFILE;delete env.HF_TOKEN;
 const child=spawn(executable,[],{windowsHide:true,env,stdio:'ignore'});let browser,page;let ownedServer=false;
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,timeout=30000){const deadline=Date.now()+timeout;let error;while(Date.now()<deadline){try{const value=await fn();if(value)return value;}catch(e){error=e;}await delay(200);}throw error||new Error('Native check timed out');}
-async function invoke(command,args={}){return page.evaluate(({command,args})=>window.__TAURI_INVOKE__(command,args),{command,args});}
+async function invoke(command,args={}){return page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});}
 async function job(id,timeout=180000){const report=await until(async()=>{const r=(await invoke('jobs_list')).find(j=>j.id===id);return r&&r.phase!=='running'?r:null;},timeout);assert.equal(report.phase,'complete',report.message);return report;}
 
 async function resources(){return new Promise((resolve,reject)=>{const p=spawn('powershell.exe',['-NoProfile','-File',path.join(root,'tests/native-resources.ps1'),'-RootProcessId',String(child.pid)],{windowsHide:true,stdio:['ignore','pipe','pipe']});let out='',error='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>error+=b);p.on('error',reject);p.on('exit',code=>{try{if(code)throw Error(error);resolve(JSON.parse(out));}catch(e){reject(e);}});});}

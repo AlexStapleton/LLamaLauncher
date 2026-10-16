@@ -44,11 +44,11 @@ chmod +x LLamaLauncher-1.1.1-Linux-x86_64.AppImage
 ./LLamaLauncher-1.1.1-Linux-x86_64.AppImage
 ```
 
-If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; no host WebKitGTK 4.0 installation is required. Linux x86_64 with glibc 2.35 or newer and a desktop display is required; this is not an ARM or Alpine/musl build. Keep the adjacent `data` folder when replacing the AppImage. The old 1.1 Linux ZIP was a raw binary requiring system WebKitGTK; use the new AppImage instead.
+If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; no host WebKitGTK 4.0 installation is required. Linux x86_64 with glibc 2.39 or newer and a desktop display is required; this is not an ARM or Alpine/musl build. Keep the adjacent `data` folder when replacing the AppImage. The old 1.1 Linux ZIP was a raw binary requiring system WebKitGTK; use the new AppImage instead.
 
 ## Build on Windows
 
-Install Node.js 22.12 or later, the Windows MSVC Rust toolchain, Visual Studio C++ Build Tools/Windows SDK, and WebView2 Runtime. The frontend uses Vite 8 and TypeScript; the runtime remains Tauri 1.x. From this repository:
+Install Node.js 22.12 or later, the Windows MSVC Rust toolchain, Visual Studio C++ Build Tools/Windows SDK, and WebView2 Runtime. The frontend uses Vite 8 and TypeScript; the runtime uses Tauri 2.x. From this repository:
 
 ```powershell
 cd tauri-app
@@ -60,16 +60,16 @@ Run `tauri-app/desktop-app/llama-server-configurator.exe`. The frontend is embed
 
 ## Build on Linux
 
-For an Ubuntu 22.04-based environment, install the Tauri 1 system dependencies:
+For an Ubuntu 24.04-based environment, install the Tauri 2 system dependencies:
 
 ```sh
-sudo apt-get install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf
+sudo apt-get install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev patchelf
 cd tauri-app
 npm ci
 bash build-linux.sh
 ```
 
-Use the native Linux Rust toolchain. The result is `tauri-app/desktop-app/llama-server-configurator`. A desktop display session is required to run the GUI. This raw developer binary needs the system libraries above. For the distributable AppImage, run `bash package-appimage.sh` on Linux (the script uses pinned Tauri CLI 1.6.3 through npx). Native Linux CI passed for 1.1; 1.1.1 adds AppImage and clean-host packaging checks.
+Use the native Linux Rust toolchain. The result is `tauri-app/desktop-app/llama-server-configurator`. A desktop display session is required to run the GUI. This raw developer binary needs the system libraries above. For the distributable AppImage, run `bash package-appimage.sh` on Linux (the script uses the locked Tauri 2 CLI through npx). Native Linux CI passed for 1.1; 1.1.1 adds AppImage and clean-host packaging checks.
 
 ## MCP and router mode
 
@@ -114,7 +114,7 @@ On this Windows desktop use `cargo +stable-x86_64-pc-windows-msvc` in those comm
 
 Source lives in `tauri-app/src/main.rs`, `config.rs`, `catalog.rs`, `server.rs`, `framing.rs`, `mcp.rs`, `storage.rs`, `process_tree.rs`, and `src/frontend/`. Configuration validation stays in main.rs. Run `npm run types:generate` after changing a native DTO and commit its generated interface; `npm run typecheck` detects drift. See [AGENTS.md](AGENTS.md) and [the Windows build guide](HOW_TO_BUILD_WINDOWS.md). Generated binaries, dependency directories, screenshots, caches and credentials are excluded from version control.
 
-The main UI/MCP modules are strict TypeScript (`app.ts`, `mcp-ui.ts`); native job results are validated at the frontend boundary. Windows local checks passed 58 Rust tests and 11 frontend tests, plus browser event regressions and native integration. Three Rust fixture entry points are launched by their parent tests. Optional native checks are `tests/native-features.mjs`, `tests/portable-storage.mjs` and `tests/portable-package-smoke.mjs`; their required inputs and isolation are documented in [AGENTS.md](AGENTS.md). Linux uses a compatible [glib source backport](vendor/glib-0.15.12/BACKPORT.md); its optimized regression must run on Linux before release.
+The main UI/MCP modules are strict TypeScript (`app.ts`, `mcp-ui.ts`); native job results are validated at the frontend boundary. Windows local checks passed 58 Rust tests and 11 frontend tests, plus browser event regressions and native integration. Three Rust fixture entry points are launched by their parent tests. Optional native checks are `tests/native-features.mjs`, `tests/portable-storage.mjs` and `tests/portable-package-smoke.mjs`; their required inputs and isolation are documented in [AGENTS.md](AGENTS.md). Linux uses a compatible [glib source backport](vendor/glib-0.18.5/BACKPORT.md); its optimized regression must run on Linux before release.
 
 ## Navigation and engine setup
 

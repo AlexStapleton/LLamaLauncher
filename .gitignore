@@ -9,3 +9,6 @@
 *.log
 .env
 .env.*
+
+# Tauri generates JSON schemas during native builds.
+/tauri-app/gen/schemas/

@@ -7,6 +7,8 @@ bash package-appimage.sh --skip-checks
 image=$(realpath "artifacts/release/LLamaLauncher-$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).version')-Linux-x86_64.AppImage")
 fixture=$(mktemp -d)
 (cd "$fixture" && "$image" --appimage-extract > extraction.log)
-[[ -n "$(find "$fixture/squashfs-root" -name 'libwebkit2gtk-4.0.so.37*' -print -quit)" ]] || { echo 'AppImage is missing WebKitGTK' >&2; exit 1; }
+[[ -n "$(find "$fixture/squashfs-root" -name 'libwebkit2gtk-4.1.so.0*' -print -quit)" ]] || { echo 'AppImage is missing WebKitGTK' >&2; exit 1; }
 [[ -n "$(find "$fixture/squashfs-root" -name 'WebKitWebProcess' -print -quit)" ]] || { echo 'AppImage is missing the WebKit process helper' >&2; exit 1; }
+[[ -n "$(find "$fixture/squashfs-root" -name 'libsoup-3.0.so*' -print -quit)" ]] || { echo 'AppImage is missing libsoup 3' >&2; exit 1; }
+[[ -z "$(find "$fixture/squashfs-root" \( -name 'libsoup-2.4.so*' -o -name 'libwebkit2gtk-4.0.so*' \) -print -quit)" ]] || { echo 'AppImage unexpectedly contains the deprecated WebKit/libsoup stack' >&2; exit 1; }
 bash tests/appimage-clean-host.sh "$image"

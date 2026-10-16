@@ -21,6 +21,9 @@ try{
   for(let run=0;run<5;run++){
     const page=await browser.newPage({viewport:{width:1200,height:700}});
     await page.addInitScript(({help})=>{
+      let callbackId=0;
+      window.__TAURI_INTERNALS__={invoke:(command,args)=>window.__TAURI_INVOKE__(command,args),transformCallback:callback=>{const id=++callbackId;window[`_${id}`]=callback;return id;},unregisterCallback:id=>{delete window[`_${id}`];}};
+      window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
       window.__TAURI_INVOKE__=async(command)=>{
         if(command==='platform_info')return{windows:true};
         if(command==='profiles_list')return[];
@@ -38,7 +41,7 @@ try{
         if(command==='server_status')return'stopped';
         if(command==='list_models')return[];
         if(command==='server_logs')return'';
-        if(command==='tauri'||command==='cancel_models')return null;
+        if(command.startsWith('plugin:event|')||command==='cancel_models')return null;
         throw new Error(`Unexpected benchmark command ${command}`);
       };
     },{help});

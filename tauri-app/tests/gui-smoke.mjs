@@ -47,6 +47,9 @@ try {
     const entry={id,name,config};profileStore.set(id,entry);return structuredClone(entry);
   });
   await page.addInitScript(({defaults,help,fixtureModels}) => {
+    let callbackId=0;
+    window.__TAURI_INTERNALS__={invoke:(command,args)=>window.__TAURI_INVOKE__(command,args),transformCallback:callback=>{const id=++callbackId;window[`_${id}`]=callback;return id;},unregisterCallback:id=>{delete window[`_${id}`];}};
+    window.__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:()=>{}};
     window.__testRunning=false;
     window.__savedConfig=null;
     window.__TAURI_INVOKE__=async (command,args={}) => {
@@ -64,7 +67,8 @@ try {
         case 'get_defaults':return defaults;
         case 'platform_info':return {windows:true};
         case 'cancel_models':return null;
-        case 'tauri':if(args.__tauriModule==='Event'&&args.message.cmd==='listen'){window.__listeners??={};window.__listeners[args.message.event]=args.message.handler;window.__emit=(event,payload)=>window[`_${window.__listeners[event]}`]({event,payload,id:1});return 1;}return null;
+        case 'plugin:event|listen':{window.__listeners??={};window.__listeners[args.event]=args.handler;window.__emit=(event,payload)=>window[`_${window.__listeners[event]}`]({event,payload,id:1});return 1;}
+        case 'plugin:event|unlisten':return null;
         case 'server_help':return help;
         case 'list_models':return fixtureModels;
         case 'browse_path':return args.kind==='models'?'C:\\Fixtures\\Models':args.kind==='binary'?defaults.llama_cpp_path:fixtureModels[1].path;
@@ -82,7 +86,6 @@ try {
         default:throw new Error(`Unexpected command ${command}`);
       }
     };
-    window.__TAURI_IPC__=({cmd,callback,error,...args})=>window.__TAURI_INVOKE__(cmd,args).then(result=>window[`_${callback}`](result),reason=>window[`_${error}`](String(reason)));
   }, {defaults,help,fixtureModels});
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.waitForFunction(()=>document.documentElement.dataset.ready==='true').catch(async e=>{throw new Error(`${e.message}\nStatus: ${await page.locator('#statusBar').textContent()}\nErrors: ${errors.join('; ')}`);});

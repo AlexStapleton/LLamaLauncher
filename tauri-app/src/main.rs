@@ -8,6 +8,7 @@ use std::{
 };
 #[cfg(test)]
 use std::{process::Child, sync::Mutex};
+use tauri::Emitter;
 use tauri::{Manager, State};
 mod downloads;
 mod features;
@@ -422,7 +423,7 @@ async fn list_models(
             }
         }
         let models = scan_models_cancel(&path, Some(generation), |visited, models| {
-            let _ = app.emit_all(
+            let _ = app.emit(
                 "model-scan",
                 serde_json::json!({"directory":directory,"visited":visited,"models":models}),
             );
@@ -635,7 +636,7 @@ async fn get_defaults(app: tauri::AppHandle) -> Result<Config, String> {
                 candidates.push(parent.join("runtime"));
             }
         }
-        if let Some(resources) = app.path_resolver().resource_dir() {
+        if let Ok(resources) = app.path().resource_dir() {
             candidates.push(resources.join("artifacts/portable/runtime"));
         }
         for directory in candidates {
@@ -896,7 +897,7 @@ async fn mcp_status(
                     Ok(tools) => {
                         if let Some(tools) = tools {
                             state.report.tools = tools;
-                            let _ = app.emit_all("mcp-tools", &state.report.tools);
+                            let _ = app.emit("mcp-tools", &state.report.tools);
                         }
                         state.client = Some(client);
                     }
@@ -922,7 +923,7 @@ async fn mcp_status(
 #[tauri::command]
 async fn browse_path(kind: String, directory: Option<String>) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut dialog = tauri::api::dialog::blocking::FileDialogBuilder::new();
+        let mut dialog = rfd::FileDialog::new();
         if let Some(directory) = directory.filter(|d| Path::new(d).is_dir()) {
             dialog = dialog.set_directory(directory);
         }
@@ -951,7 +952,7 @@ async fn browse_path(kind: String, directory: Option<String>) -> Result<Option<S
 async fn save_config(config: Config) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let config = export_config(config);
-        let path = tauri::api::dialog::blocking::FileDialogBuilder::new()
+        let path = rfd::FileDialog::new()
             .set_title("Save configuration")
             .add_filter("JSON", &["json"])
             .set_file_name("llama-server-config.json")
@@ -974,7 +975,7 @@ fn export_config(config: Config) -> Config {
 #[tauri::command]
 async fn load_config() -> Result<Option<Config>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let path = tauri::api::dialog::blocking::FileDialogBuilder::new()
+        let path = rfd::FileDialog::new()
             .set_title("Load configuration")
             .add_filter("JSON", &["json"])
             .pick_file();
@@ -1407,42 +1408,40 @@ fn main() {
     let _storage_lock = match storage::acquire_lock(&storage::profile_directory()) {
         Ok(lock) => lock,
         Err(error) => {
-            tauri::api::dialog::blocking::message(
-                None::<&tauri::Window>,
-                "Cannot open launcher data",
-                error,
-            );
+            rfd::MessageDialog::new()
+                .set_title("Cannot open launcher data")
+                .set_description(error)
+                .set_level(rfd::MessageLevel::Error)
+                .show();
             return;
         }
     };
     if let Err(error) = storage::initialize_portable() {
-        tauri::api::dialog::blocking::message(
-            None::<&tauri::Window>,
-            "Cannot initialize portable storage",
-            error,
-        );
+        rfd::MessageDialog::new()
+            .set_title("Cannot initialize portable storage")
+            .set_description(error)
+            .set_level(rfd::MessageLevel::Error)
+            .show();
         return;
     }
     let mut context = tauri::generate_context!();
-    let windows = context.config().tauri.windows.clone();
-    context.config_mut().tauri.windows.clear();
+    let windows = context.config().app.windows.clone();
+    context.config_mut().app.windows.clear();
     tauri::Builder::default()
         .manage(CloseGuard::default())
-        .on_window_event(|event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
-                if event
-                    .window()
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window
                     .state::<CloseGuard>()
                     .ready
                     .load(std::sync::atomic::Ordering::SeqCst)
-                    && !event
-                        .window()
+                    && !window
                         .state::<CloseGuard>()
                         .allow
                         .load(std::sync::atomic::Ordering::SeqCst)
                 {
                     api.prevent_close();
-                    let _ = event.window().emit("launcher-close-request", ());
+                    let _ = window.emit("launcher-close-request", ());
                 }
             }
         })
@@ -1455,17 +1454,20 @@ fn main() {
         .manage(downloads::State::load())
         .setup(move |app| {
             for window in windows {
-                tauri::WindowBuilder::from_config(app, window)
+                tauri::WebviewWindowBuilder::from_config(app, &window)?
                     .data_directory(storage::profile_directory().join("webview"))
                     .build()?;
             }
-            session::watch_router(app.handle(), app.state::<AppState>().inner().clone());
+            session::watch_router(
+                app.handle().clone(),
+                app.state::<AppState>().inner().clone(),
+            );
             monitor::start(
-                app.handle(),
+                app.handle().clone(),
                 app.state::<monitor::State>().inner().clone(),
                 app.state::<AppState>().inner().clone(),
             );
-            let recovery_app = app.handle();
+            let recovery_app = app.handle().clone();
             let recovery_jobs = app.state::<jobs::State>().inner().clone();
             tauri::async_runtime::spawn(async move {
                 if let Ok((id, _)) = recovery_jobs.begin("runtime-recovery") {
@@ -1477,7 +1479,7 @@ fn main() {
                     recovery_jobs.finish(&recovery_app, &id, result);
                 }
             });
-            let handle = app.handle();
+            let handle = app.handle().clone();
             let state = app.state::<AppState>().inner().clone();
             std::thread::spawn(move || {
                 let Ok(client) = reqwest::blocking::Client::builder()
@@ -1494,7 +1496,7 @@ fn main() {
                     server::check_readiness(&state, &client);
                     if let Ok(status) = server::status(&state) {
                         if status != previous {
-                            let _ = handle.emit_all("server-state", &status);
+                            let _ = handle.emit("server-state", &status);
                             previous = status;
                         }
                     }
@@ -1606,7 +1608,7 @@ mod tests {
     #[test]
     // Exercise consuming last() as well as next_back() in the optimized FFI regression.
     #[allow(clippy::double_ended_iterator_last)]
-    fn glib_backport_string_iterator_is_sound_in_optimized_builds() {
+    fn glib_string_iterator_is_sound_in_optimized_builds() {
         use glib::variant::ToVariant;
         let value = vec!["first", "middle", "last"].to_variant();
         let mut iter = value.array_iter_str().unwrap();

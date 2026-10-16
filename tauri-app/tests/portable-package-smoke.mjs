@@ -44,7 +44,7 @@ try{
     browser=await until(()=>chromium.connectOverCDP(`http://127.0.0.1:${port}`,{timeout:5000}));
     const page=await until(()=>browser.contexts()[0]?.pages()[0]);
     await page.waitForFunction(()=>document.documentElement.dataset.ready==='true');
-    const actual=await page.evaluate(()=>window.__TAURI_INVOKE__('storage_location'));
+    const actual=await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('storage_location'));
     assert.equal(path.resolve(actual),location);assert.ok(fs.existsSync(path.join(location,'webview')));
     assert.equal(await page.locator('#start_server').isVisible(),true);
     assert.equal(await page.locator('#option_grid .option-card').count(),0,'Fresh Launch does not build hidden settings controls');
@@ -53,7 +53,7 @@ try{
     const cache=page.locator('.option-card').filter({has:page.locator('.option-category').filter({hasText:/^--cache-type-v ·/})});
     await cache.locator('.impact-details summary').click();await cache.locator('.impact-details dd').first().waitFor();
     assert.match(await cache.textContent(),/77% combined/);assert.equal(await cache.locator('.impact-details dd').count(),6);
-    const blocked=await page.evaluate(async()=>{try{await window.__TAURI_INVOKE__('open_llama_documentation',{url:'https://example.com/unrelated'});return false;}catch(e){return String(e).includes('Only official llama.cpp');}});
+    const blocked=await page.evaluate(async()=>{try{await window.__TAURI_INTERNALS__.invoke('open_llama_documentation',{url:'https://example.com/unrelated'});return false;}catch(e){return String(e).includes('Only official llama.cpp');}});
     assert.equal(blocked,true);
     console.log(JSON.stringify({freshPackagedGui:true,packagedFixedWebView:true,dataBesideExecutable:true,dependencyNotices:true,reviewedSettingsHelp:true,nativeDocumentationValidation:true,method:'CDP'}));
   }

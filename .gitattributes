@@ -10,4 +10,4 @@
 *.yml text eol=lf
 *.md text eol=lf
 # The vendored backport is checked against upstream byte hashes on both platforms.
-vendor/glib-0.15.12/** -text
+vendor/glib-0.18.5/** -text

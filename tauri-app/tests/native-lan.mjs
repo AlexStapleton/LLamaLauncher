@@ -7,7 +7,7 @@ async function freePort(){const s=net.createServer();await new Promise(r=>s.list
 const debugPort=await freePort();const env={...process.env,LOCALAPPDATA:fixture,LLAMA_LAUNCHER_DATA_DIR:path.join(fixture,'data'),WEBVIEW2_USER_DATA_FOLDER:path.join(fixture,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${debugPort}`};if(process.env.LLAMA_FIXED_WEBVIEW)env.WEBVIEW2_BROWSER_EXECUTABLE_FOLDER=process.env.LLAMA_FIXED_WEBVIEW;delete env.LLAMA_MCP_PROFILE;delete env.HF_TOKEN;
 const child=spawn(process.env.LLAMA_LAUNCHER_EXE,[],{env,windowsHide:true,stdio:'ignore'});let browser,page,owned=false;
 async function until(fn){const deadline=Date.now()+45000;while(Date.now()<deadline){try{const value=await fn();if(value)return value;}catch{}await new Promise(r=>setTimeout(r,200));}throw Error('Native LAN check timed out');}
-async function invoke(command,args={}){return page.evaluate(({command,args})=>window.__TAURI_INVOKE__(command,args),{command,args});}
+async function invoke(command,args={}){return page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});}
 try{
   browser=await until(()=>chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`));page=await until(()=>browser.contexts()[0]?.pages()[0]);await page.waitForFunction(()=>document.documentElement.dataset.ready==='true');
   const port=await freePort();const config={...await invoke('get_defaults'),llama_cpp_path:process.env.LLAMA_SERVER_EXE,models_path:path.dirname(process.env.LLAMA_MODEL_FILE),model_file:process.env.LLAMA_MODEL_FILE,host:'0.0.0.0',port,argument_overrides:[{flag:'--ctx-size',values:['512']},{flag:'--threads',values:['2']}]};
