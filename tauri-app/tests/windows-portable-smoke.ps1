@@ -53,7 +53,10 @@ function Check-PortableGui {
         if(-not $ownedGui.CloseMainWindow()){throw 'Could not close the owned GUI normally'}
         if(-not $wrapper.WaitForExit(120000)){throw 'Portable container did not finish after GUI close'}
         if($wrapper.ExitCode -ne 0){throw "Portable launcher returned $($wrapper.ExitCode)"}
-        if(Test-Path -LiteralPath $runtimeFolder){throw 'Normal exit did not clean its temporary runtime'}
+        if(Test-Path -LiteralPath $runtimeFolder){
+            $remaining=@(Get-ChildItem -LiteralPath $runtimeFolder -File -Recurse | Select-Object -First 12 -ExpandProperty Name)
+            throw "Normal exit did not clean its temporary runtime; remaining files: $($remaining -join ', ')"
+        }
     } finally {
         # Only the owned fixture tree can be stopped on failure. Normal success
         # uses the app's close handshake and lets the container clean itself.

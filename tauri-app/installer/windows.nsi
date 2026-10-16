@@ -42,6 +42,9 @@ Section "Run"
     SetErrorLevel 4
     Quit
   ${EndIf}
+  ; Do not keep the container's working directory inside the runtime it must
+  ; remove. Use the original EXE's directory while running the child GUI.
+  SetOutPath "$EXEDIR"
   run_gui:
     ClearErrors
     ExecWait '"$PLUGINSDIR\app\llama-server-configurator.exe"' $0
@@ -55,6 +58,25 @@ Section "Run"
     ${If} $0 == 75
       Goto run_gui
     ${EndIf}
-  SetErrorLevel $0
-  ; NSIS cleans only its unique $PLUGINSDIR after the GUI exits.
+  StrCpy $R0 $0
+  ; WebView2 children can finish asynchronously after the GUI process exits.
+  ; Resolve/check the exact owned extraction target before recursive cleanup;
+  ; never apply this to data, EXEDIR or any environment-supplied storage path.
+  GetFullPathName $R2 "$PLUGINSDIR"
+  GetFullPathName $R3 "$PLUGINSDIR\app"
+  ${If} $R2 != ""
+  ${AndIf} $R3 == "$R2\app"
+    StrCpy $R1 0
+    cleanup_runtime:
+      RMDir /r "$R3"
+      IfFileExists "$R3" 0 cleanup_finished
+      IntOp $R1 $R1 + 1
+      ${If} $R1 < 40
+        Sleep 250
+        Goto cleanup_runtime
+      ${EndIf}
+    cleanup_finished:
+  ${EndIf}
+  SetErrorLevel $R0
+  ; NSIS then cleans its unique plugin directory itself.
 SectionEnd
