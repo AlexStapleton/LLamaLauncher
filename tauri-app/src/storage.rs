@@ -37,7 +37,7 @@ pub fn issues() -> Vec<serde_json::Value> {
             }
         }
     }
-    FAULTS.get_or_init(Default::default).lock().map(|f|f.iter().filter(|(p,_)|paths.contains(p)).map(|(p,m)|serde_json::json!({"name":p.file_name().unwrap_or_default(),"message":m,"backup":p.with_extension("bin.bak").is_file()})).collect()).unwrap_or_default()
+    FAULTS.get_or_init(Default::default).lock().map(|f|f.iter().filter(|(p,_)|paths.contains(p)).map(|(p,m)|serde_json::json!({"name":p.file_name().unwrap_or_default().to_string_lossy(),"message":m,"backup":p.with_extension("bin.bak").is_file()})).collect()).unwrap_or_default()
 }
 pub fn load_optional<T: serde::de::DeserializeOwned>(
     path: &Path,
