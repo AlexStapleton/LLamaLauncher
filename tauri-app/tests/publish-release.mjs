@@ -17,6 +17,8 @@ async function api(suffix,method='GET',body){
   return response.status===204?null:response.json();
 }
 async function hash(file){const digest=createHash('sha256');for await(const chunk of fs.createReadStream(file))digest.update(chunk);return digest.digest('hex');}
+const current=await api('git/ref/heads/main');
+if(current.object?.sha!==sha)throw Error('Superseded release build: main has moved; do not publish older packages');
 const artifacts=await api(`actions/runs/${process.env.GITHUB_RUN_ID}/artifacts?per_page=100`),assets=[];
 for(const platform of ['Windows','Linux']){
   const artifact=artifacts.artifacts.find(a=>a.name===`release-assets-${platform}`&&!a.expired);if(!artifact)throw Error(`Missing verified ${platform} artifact`);

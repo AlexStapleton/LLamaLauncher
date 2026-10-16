@@ -2,7 +2,13 @@
 
 ## Migration implementation
 
-The user selected modernization before publication. Source is migrated to stable Tauri 2.12.4, Wry 0.57.0, Rust WebKitGTK binding 2.0.2 and soup3 0.5.0, JavaScript API 2.12.4 and CLI 2.12.3. These are Rust/npm package versions, not native engine versions. The Linux build baseline is Ubuntu 24.04 (glibc 2.39), using apt updates/security packages. Publication requires WebKitGTK engine 2.54 or newer, records exact native package versions and rejects bundled WebKitGTK 4.0/libsoup 2. Tauri 2 still uses GTK 3 and GLib Rust binding 0.18.5; the iterator fix is carried forward in a fresh verified 0.18.5 source backport, replacing the 0.15 fork. The yanked zip 2.4.2 archive dependency is replaced by current zip 9.0.4; archive containment/link/size tests remain required. Native Windows/Linux and clean-host package validation must pass before publication.
+The user selected modernization before publication. Source is migrated to stable Tauri 2.12.4, Wry 0.57.0, Rust WebKitGTK binding 2.0.2 and soup3 0.5.0, JavaScript API 2.12.4 and CLI 2.12.3. These are Rust/npm package versions, not native engine versions. The Linux build baseline is Ubuntu 24.04 (glibc 2.39), using apt updates/security packages. Publication requires WebKitGTK engine 2.52.6 or newer, records exact native package versions and rejects bundled WebKitGTK 4.0/libsoup 2. Tauri 2 still uses GTK 3 and GLib Rust binding 0.18.5; the iterator fix is carried forward in a fresh verified 0.18.5 source backport, replacing the 0.15 fork. The yanked zip 2.4.2 archive dependency is replaced by current zip 9.0.4; archive containment/link/size tests remain required. Native Windows/Linux and clean-host package validation must pass before publication.
+
+## Distro baseline versus upstream
+
+Ubuntu Launchpad currently publishes `2.52.6-0ubuntu0.24.04.1` for WebKitGTK 4.1 in Noble Security and Updates (published 2026-08-31). Upstream lists 2.54.1 as newest stable. These are different release policies: the package gate accepts the current supported Ubuntu security baseline, records the exact packaged version, and does not claim it is newest upstream. Rebuild with Ubuntu security updates when servicing the bundled runtime. Upstream advisories and Ubuntu patch coverage must be reviewed during servicing; an apt security-pocket label or a zero RustSec result does not prove the native WebKit engine has no vulnerabilities. The broad production sign-off remains open.
+
+Package inventory source: [Ubuntu Launchpad primary archive API](https://api.launchpad.net/1.0/ubuntu/+archive/primary?ws.op=getPublishedBinaries&binary_name=libwebkit2gtk-4.1-0&exact_match=true&distro_arch_series=https://api.launchpad.net/1.0/ubuntu/noble/amd64&status=Published).
 
 ## Original finding
 
@@ -37,3 +43,7 @@ The framework/configuration migration is a separate functional change from the 1
 - [Tauri 2 Linux prerequisites](https://v2.tauri.app/start/prerequisites/): WebKitGTK 4.1.
 - [GTK upstream](https://www.gtk.org/): GTK 4 is current stable; GTK 3 is labeled old stable.
 - [Tauri AppImage guidance](https://v2.tauri.app/distribute/appimage/): use the oldest supported baseline with the required WebKitGTK ABI, and test actual distributions.
+
+Dependency audit after migration: cargo-audit 0.22.2 against RustSec commit `479c888ce4401313bca61ba4aba2d0f6244c4a09` (2026-10-15) reports zero vulnerabilities and one unmaintained build-macro warning (`proc-macro-error` 1.0.4). The local GLib source fix is verified separately and is not covered by the path-dependency audit. npm install reports zero vulnerabilities. This is not a native Linux C-library vulnerability scan.
+
+Tauri 2 CSP retains the existing source restrictions and adds only its documented native IPC transports (`ipc:` and `http://ipc.localhost`) to connect-src. The GUI still has no arbitrary remote network/script permission.

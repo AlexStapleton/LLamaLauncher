@@ -4,8 +4,9 @@ if(process.platform!=='linux')throw Error('Run the Linux package inventory on Li
 const run=(command,args)=>execFileSync(command,args,{encoding:'utf8'}).trim();
 const names=['webkit2gtk-4.1','libsoup-3.0','gtk+-3.0','glib-2.0','openssl'];
 const versions=Object.fromEntries(names.map(name=>[name,run('pkg-config',['--modversion',name])]));
-const [major,minor]=versions['webkit2gtk-4.1'].split('.').map(Number);
-if(major<2||(major===2&&minor<54))throw Error(`WebKitGTK ${versions['webkit2gtk-4.1']} is older than the reviewed 2.54 stable line; update build packages before publishing`);
+if(!/^\d+\.\d+\.\d+$/.test(versions['webkit2gtk-4.1']))throw Error('Cannot parse native WebKitGTK engine version');
+const [major,minor,patch]=versions['webkit2gtk-4.1'].split('.').map(Number);
+if(major<2||(major===2&&(minor<52||(minor===52&&patch<6))))throw Error(`WebKitGTK ${versions['webkit2gtk-4.1']} is older than the reviewed Ubuntu security-package baseline 2.52.6; update build packages before publishing`);
 const inventory=run('dpkg-query',['-W','-f=${binary:Package}\t${Version}\n','libwebkit2gtk-4.1-0','libjavascriptcoregtk-4.1-0','libsoup-3.0-0','libgtk-3-0t64','libglib2.0-0t64','libssl3t64']);
 const text=`LLamaLauncher Linux build packages\nGenerated from the release build host, not inferred from Rust binding versions.\n${fs.readFileSync('/etc/os-release','utf8')}\nResolved native APIs:\n${Object.entries(versions).map(([name,v])=>`${name}\t${v}`).join('\n')}\n\nUbuntu packages:\n${inventory}\n\n${run('ldd',['--version']).split('\n')[0]}\n`;
 fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/LINUX_PACKAGE_VERSIONS.txt',text);console.log(text);

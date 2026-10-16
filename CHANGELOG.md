@@ -2,7 +2,7 @@
 
 ## 1.1.1 — 2026-10-16
 
-- Migrate to stable Tauri 2.12.4 and current JavaScript/CLI APIs; preserve CSP and restrict event permissions to the main local window. Replace Linux WebKitGTK 4.0/libsoup 2 with 4.1/libsoup 3, require the WebKit 2.54 engine line, and publish exact native package versions. The Linux baseline is Ubuntu 24.04/glibc 2.39.
+- Migrate to stable Tauri 2.12.4 and current JavaScript/CLI APIs; preserve CSP and restrict event permissions to the main local window. Replace Linux WebKitGTK 4.0/libsoup 2 with 4.1/libsoup 3, require the WebKit 2.52.6+ engine line, and publish exact native package versions. The Linux baseline is Ubuntu 24.04/glibc 2.39.
 - Replace yanked zip 2.4.2 with maintained zip 9.0.4; retain archive containment, symlink rejection and extraction-size regressions.
 - Replace the old GLib 0.15 compatibility fork with the matching 0.18.5 source backport still required by Tauri 2/GTK 3; retain source integrity and optimized iterator checks.
 
