@@ -30,8 +30,9 @@ for ((attempt=0;attempt<60;attempt++)); do
   if ! kill -0 "$launcher_pid" 2>/dev/null; then cat "$fixture/stderr"; exit 1; fi
   if grep -E 'panicked at|Unable to initialize|error while loading shared libraries' "$fixture/stderr"; then cat "$fixture/stderr"; exit 1; fi
   if [[ -s "$expected_data/working-settings.bin" ]] && xwininfo -root -tree | grep -q 'Llama Server Configuration Manager'; then
-    grep -Fq "$fixture/Model downloads/LLamaLauncher/models" "$expected_data/working-settings.bin"
-    test -d "$fixture/Model downloads/LLamaLauncher/models"
+    grep -Fq 'llama-launcher-relative:/models' "$expected_data/working-settings.bin"
+    test -d "$XDG_DATA_HOME/llama-launcher/models"
+    test ! -e "$fixture/Model downloads/LLamaLauncher/models"
     test -d "$XDG_DATA_HOME/llama-launcher"
     test -d "$XDG_STATE_HOME/llama-launcher"
     test -d "$XDG_CACHE_HOME/llama-launcher"
@@ -39,7 +40,7 @@ for ((attempt=0;attempt<60;attempt++)); do
     [[ $(stat -c %a "$expected_data") == 700 ]]
     if [[ $# -gt 0 ]]; then test ! -e "$adjacent_data"; fi
     cp "$fixture/stderr" artifacts/linux-window-stderr.log
-    echo 'Native Linux window initialized, saved private XDG configuration, and used the configured XDG Downloads folder without adjacent AppImage data.'
+    echo 'Native Linux window initialized, saved private XDG configuration, and used application data for models without adjacent AppImage data.'
     exit 0
   fi
   sleep 1

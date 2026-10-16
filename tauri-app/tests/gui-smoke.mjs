@@ -122,6 +122,12 @@ try {
   await page.waitForFunction(()=>document.getElementById('model_select').options.length===3);
   assert.match(await page.locator('#modelCount').textContent(),/2 GGUF models/);
   assert.match(await page.locator('#model_file').inputValue(),/alpha.gguf/);
+  const chosenModelsFolder=await page.locator('#models_path').inputValue();
+  await page.waitForFunction(()=>document.getElementById('settings_save_state').textContent==='Working settings saved.');
+  assert.equal(await page.evaluate(()=>window.__featureCommand('working_load').then(config=>config.models_path)),chosenModelsFolder);
+  await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.ready==='true');
+  await openSection('Models & downloads');
+  assert.equal(await page.locator('#models_path').inputValue(),chosenModelsFolder,'Custom model folder must survive reopening the application');
   await page.locator('#model_select').selectOption(fixtureModels[1].path);
   assert.match(await page.locator('#summaryModel').textContent(),/beta.gguf/);
   await page.waitForFunction(()=>document.getElementById('preview_text').textContent.includes('beta.gguf'));
@@ -308,7 +314,9 @@ try {
   await page.locator('#hub_search').fill('fixture');await page.getByRole('button',{name:'Search',exact:true}).click();await page.getByRole('button',{name:'View GGUF files',exact:true}).click();
   assert.equal(await page.locator('#hub_repository_files').isVisible(),true);
   await page.locator('.hub-files input').first().check();assert.equal(await page.locator('.hub-files input').nth(1).isChecked(),true);assert.equal(await page.locator('.hub-files input').nth(2).isChecked(),false);
+  const downloadFolder=await page.locator('#models_path').inputValue();
   await page.getByRole('button',{name:'Download selected files',exact:true}).click();await page.getByRole('button',{name:'Use downloaded model',exact:true}).waitFor();assert.equal(featureFixture.downloads[0].files.length,2);
+  assert.equal(featureFixture.downloads[0].root,downloadFolder,'GGUF downloads must use the selected Models folder');
   await openSection('Models & downloads');
   await page.getByRole('button',{name:'Refresh router state',exact:true}).click();const router=page.locator('#models-panel .card').filter({has:page.getByRole('heading',{name:'Router models',exact:true})});
   await router.getByRole('button',{name:'Load',exact:true}).click();assert.equal(featureFixture.routerActions[0].model,'fixture-model');assert.equal(featureFixture.routerActions[0].load,true);

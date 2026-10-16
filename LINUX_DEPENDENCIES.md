@@ -2,7 +2,7 @@
 
 ## Current unreleased baseline: Debian 13
 
-Current source follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/0.8/) for Linux config, application data, state and cache, and uses [XDG user directories](https://docs.gtk.org/glib/func.get_user_special_dir.html) for the default model-download location. The shared policy is `tauri-app/src/locations.rs`; defaults, migration and explicit overrides are documented in README. An AppImage's parent directory is no longer the default writable data directory. Native window smoke checks verify a custom Downloads folder containing spaces, private config permissions and the absence of adjacent AppImage data.
+Current source follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/0.8/) for Linux config, application data, state and cache. New GGUF downloads default to `$XDG_DATA_HOME/llama-launcher/models` (`~/.local/share/llama-launcher/models` when unset); users can save their own folder in Models. The shared policy is `tauri-app/src/locations.rs`; defaults, migration and explicit overrides are documented in README. An AppImage's parent directory is no longer the default writable data directory. Native window smoke checks require models in application data, private config permissions and the absence of adjacent AppImage data, even when a separate desktop Downloads directory is configured.
 
 Typography uses the desktop system font and relative sizes. The header offers a saved 90–200% text preference; browser checks cover large text across the main sections and smaller windows. Historical migration evidence below retains its original scope; new checks must execute before being reported as passed.
 

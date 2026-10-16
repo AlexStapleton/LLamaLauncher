@@ -915,7 +915,7 @@ mod xdg_tests {
         assert!(Path::new(&config.model_file).is_file());
         assert_eq!(
             crate::locations::models(),
-            fixture.join("Localized downloads/LLamaLauncher/models")
+            fixture.join("data/llama-launcher/models")
         );
         assert_eq!(
             crate::registry::runtimes_dir(),

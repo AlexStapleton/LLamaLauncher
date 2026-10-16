@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Follow XDG config/data/state/cache locations on Linux. Default GGUF downloads use the configured desktop Downloads directory; downloaded llama.cpp runtimes use application data. Preserve existing folder choices, import bounded old metadata/backups, retain original model/runtime files and treat retained runtimes as external imports.
+- Follow XDG config/data/state/cache locations on Linux. Default GGUF downloads use `$XDG_DATA_HOME/llama-launcher/models` (`~/.local/share/llama-launcher/models` when unset); downloaded llama.cpp runtimes also use application data. The Models folder picker saves a custom download location. Preserve existing folder choices, import bounded old metadata/backups, retain original model/runtime files and treat retained runtimes as external imports.
 - Use the desktop system font, readable relative type sizes and layout rows that grow with text. Add a saved 90–200% Text size control and verify the main sections at large sizes and smaller window widths.
 - Send recovery record names as strings so the recovery UI can restore damaged records, including after Linux storage migration.
 - Package Windows as a single portable EXE with its GUI runtime embedded, normal-exit temporary cleanup and recovery restart support. Offer direct EXE/AppImage test downloads without ZIP wrapping. Published 1.1.2 installers remain unchanged.

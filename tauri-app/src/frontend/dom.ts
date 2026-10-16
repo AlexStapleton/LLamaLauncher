@@ -41,6 +41,7 @@ interface Controls {
   'catalogStatus': HTMLElement;
   'refresh_options': HTMLButtonElement;
   'models_path': HTMLInputElement;
+  'models_folder_help': HTMLElement;
   'browse_models': HTMLButtonElement;
   'modelCount': HTMLElement;
   'refresh_models': HTMLButtonElement;

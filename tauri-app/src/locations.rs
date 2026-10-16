@@ -62,18 +62,6 @@ pub fn probes() -> PathBuf {
     }
 }
 pub fn models() -> PathBuf {
-    #[cfg(target_os = "linux")]
-    if override_root().is_none() {
-        // GLib reads the desktop's user-dirs.dirs, including localized/custom
-        // paths and an explicitly disabled Downloads directory ($HOME).
-        if let Some(downloads) =
-            glib::user_special_dir(glib::UserDirectory::Downloads).filter(|path| path.is_absolute())
-        {
-            return downloads.join("LLamaLauncher").join("models");
-        }
-    }
-    // No configured special directory: use persistent application data rather
-    // than inventing an English Downloads folder or writing beside the image.
     data().join("models")
 }
 pub fn record(name: &str) -> PathBuf {

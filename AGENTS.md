@@ -43,7 +43,7 @@ Publishing commits or pull requests must follow the user's authorization. The in
 
 ## Portable storage and runtime channels
 
-- Windows keeps managed state in data beside the original portable executable. Linux follows XDG config/data/state/cache locations and GLib's configured Downloads directory for new default GGUF downloads; it must not create data beside an AppImage. `locations.rs` is the shared path policy. LLAMA_LAUNCHER_DATA_DIR is an explicit isolated-fixture/portable override.
+- Windows keeps managed state in data beside the original portable executable. Linux follows XDG config/data/state/cache locations. New GGUF downloads default to models inside application data; the saved Models folder selection overrides this default. It must not create data beside an AppImage. `locations.rs` is the shared path policy. LLAMA_LAUNCHER_DATA_DIR is an explicit isolated-fixture/portable override.
 - Linux migration copies bounded metadata/backups without deleting originals or moving large model/runtime files. Decode old relative references against their original root before saving them. Retained old runtimes become external imports, so removal cannot delete them. Existing XDG records and explicitly selected model folders take priority. Exercise the isolated XDG migration fixture and clean-host native window check.
 - Preserve private file protection and relative references to managed paths. Copy legacy native records without deleting the originals; never copy developer data into packages.
 - Stable follows the latest official non-prerelease and its published binary tag when needed. Beta follows prereleases. Never silently substitute Beta for Stable. Hardware/backend selection is automatic; only the release channel is a normal user choice.
