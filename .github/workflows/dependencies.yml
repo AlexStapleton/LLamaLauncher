@@ -1,5 +1,11 @@
 name: Dependency review
 on:
+  push:
+    paths:
+      - .github/workflows/dependencies.yml
+      - tauri-app/tests/dependency-inventory.mjs
+      - tauri-app/tests/upstream-inputs.mjs
+      - tauri-app/runtime-inputs.json
   workflow_dispatch:
   schedule:
     - cron: '23 15 * * 1'
