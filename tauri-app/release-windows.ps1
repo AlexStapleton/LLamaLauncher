@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
     $releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
-    if($releaseVersion -ne '1.1.0'){throw 'This release recipe expects version 1.1.0'}
+    if($releaseVersion -ne '1.1.1'){throw 'This release recipe expects version 1.1.1'}
     $inputFolder=Join-Path $PSScriptRoot 'artifacts/release-inputs'
     New-Item -ItemType Directory -Path $inputFolder -Force | Out-Null
     $cab=Join-Path $inputFolder 'WebView2-fixed-x64.cab'
@@ -15,15 +15,7 @@ try {
     if($LASTEXITCODE -ne 0){throw 'WebView2 extraction failed'}
     $webview=Get-ChildItem -LiteralPath $unpacked -Filter msedgewebview2.exe -File -Recurse | Select-Object -First 1
     if(-not $webview -or (Get-AuthenticodeSignature -LiteralPath $webview.FullName).Status -ne 'Valid'){throw 'Fixed WebView2 signature invalid'}
-    & ./package-portable.ps1 -FixedWebView2Directory $webview.DirectoryName -ExecutablePath target/release/llama-server-configurator.exe -SkipBuild
-    if($LASTEXITCODE -ne 0){throw 'Portable packaging failed'}
-    $package=Get-ChildItem artifacts -Filter 'LLamaLauncher-Windows-x64-*.zip' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    $stamp=$package.BaseName.Replace('LLamaLauncher-Windows-x64-','')
-    $env:LLAMA_LAUNCHER_EXE=(Resolve-Path "artifacts/portable-$stamp/LLamaLauncher/llama-server-configurator.exe").Path
-    & node tests/portable-package-smoke.mjs
-    if($LASTEXITCODE -ne 0){throw 'Packaged GUI smoke failed'}
-    New-Item -ItemType Directory -Path artifacts/release -Force | Out-Null
-    $name='LLamaLauncher-1.1-Windows-x86_64.zip'
-    Copy-Item -LiteralPath $package.FullName -Destination (Join-Path 'artifacts/release' $name)
-    "$((Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToLower())  $name" | Set-Content -LiteralPath "artifacts/release/$name.sha256" -Encoding utf8
+    & ./package-windows.ps1 -FixedWebView2Directory $webview.DirectoryName -ExecutablePath target/release/llama-server-configurator.exe -SkipBuild
+    if($LASTEXITCODE -ne 0){throw 'Windows installer packaging failed'}
+    & ./tests/windows-installer-smoke.ps1 -InstallerPath artifacts/release/LLamaLauncher-1.1.1-Windows-x86_64-Setup.exe
 } finally { Pop-Location }

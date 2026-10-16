@@ -1,5 +1,8 @@
 # Production readiness and optimization review
 
+**Status correction — 2026-10-16:** This document preserves historical local review evidence. Release 1.1 subsequently passed Windows and native Ubuntu 22.04 CI, including the optimized glib regression. References below to Linux execution being outstanding describe the earlier review, not current 1.1 CI. The 1.1 Linux ZIP still required host WebKitGTK; a user encountered that missing dependency. The 1.1.1 packaging fix replaces public ZIPs with a Windows setup EXE and a WebKitGTK-bundled AppImage, with installer upgrade/uninstall and clean Ubuntu 24.04 AppImage checks required before publication. Broader GPU/driver, clean Windows, OAuth and soak gates remain open.
+
+
 Reviewed: 2026-10-14. Scope: the current local LLamaLauncher working tree, including the recently implemented features. The working tree is not a published release.
 
 LAN controls follow-up: listen address and port now appear in Launch with local-only/LAN presets and a custom interface address. Eleven frontend tests and the browser regressions pass. A native check verified wildcard binding, health access through the computer's IPv4 interface, and inference after binding that specific IP. No firewall rules were changed and no second device was tested. The benchmark measurements and package/binary hashes below identify the earlier review build, before this UI follow-up.

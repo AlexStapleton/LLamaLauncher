@@ -1,8 +1,8 @@
 # LLamaLauncher
 
-A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Windows is verified locally; Linux support uses native process groups and a portable frontend, with a Windows/Linux build workflow prepared for GitHub Actions.
+A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Windows and Linux builds passed native GitHub Actions validation for 1.1. Release 1.1.1 switches downloads to a Windows setup executable and Linux AppImage.
 
-Version 1.1 release notes and download instructions are in [RELEASE_NOTES_1.1.md](RELEASE_NOTES_1.1.md). Publication is gated on both platform jobs; release archives include checksums and dependency notices. Windows packages remain unsigned beta builds.
+Version 1.1.1 packaging notes and download instructions are in [RELEASE_NOTES_1.1.1.md](RELEASE_NOTES_1.1.1.md). Publication is gated on both platform jobs; packages include checksums and dependency notices. Windows packages remain unsigned beta builds.
 
 ## Features
 
@@ -27,11 +27,24 @@ Version 1.1 release notes and download instructions are in [RELEASE_NOTES_1.1.md
 - Bounded rotating logs, a two-worker download queue, aggregated progress, and recoverable runtime installation receipts.
 - Router monitoring includes model workers/helpers; benchmark memory figures are sampled peaks.
 
-See [portable release packaging](PORTABLE_RELEASES.md) for the Windows ZIP and Ubuntu/Debian AppImage. Models are not bundled. Windows packages contain a private fixed WebView2 runtime; llama.cpp is selected or downloaded during Launch setup. Linux packaging must be validated on Linux before distributing it.
+See [portable release packaging](PORTABLE_RELEASES.md) for the Windows setup `.exe` and Linux `.AppImage`. Models are not bundled. Windows packages contain a private fixed WebView2 runtime; llama.cpp is selected or downloaded during Launch setup. AppImage publication requires a clean Ubuntu 24.04 container startup check without system WebKitGTK.
 
 See [optimization implementation and measurements](OPTIMIZATION_IMPLEMENTATION.md) for the changes, measured tradeoffs and remaining Linux verification.
 
-For the current fixes and validation, read the [production readiness review](PRODUCTION_READINESS_REVIEW.md) and [changelog](CHANGELOG.md). The earlier optimization reports are historical. Current packages are unsigned Windows beta builds; native Linux, the broader GPU/driver matrix, clean-machine deployment and extended soak testing remain release gates. GitHub workflows are prepared; local test results do not establish that those workflows ran remotely.
+For the current fixes and validation, read the [production readiness review](PRODUCTION_READINESS_REVIEW.md) and [changelog](CHANGELOG.md). The earlier optimization reports are historical. Packages remain beta builds; the broader GPU/driver matrix, clean Windows deployment and extended soak testing remain release gates. The original 1.1 workflow passed on Windows and Linux; historical review entries retain their original scope.
+
+## Download and run
+
+Use the latest release's **Windows-x86_64-Setup.exe** on Windows. It installs for the current account, adds desktop/Start menu shortcuts, and includes WebView2 and VC runtime DLLs. The default folder is `%LOCALAPPDATA%\Programs\LLamaLauncher`; profiles and downloaded engines/models remain in its `data` folder. Updates and uninstall preserve that folder. To use an existing portable installation, close it first and choose its folder in setup, or copy its protected `data` folder to the new installation while closed (same Windows account).
+
+On Linux, download **Linux-x86_64.AppImage**, place it in a writable folder and run:
+
+```sh
+chmod +x LLamaLauncher-1.1.1-Linux-x86_64.AppImage
+./LLamaLauncher-1.1.1-Linux-x86_64.AppImage
+```
+
+If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; no host WebKitGTK 4.0 installation is required. Linux x86_64 with glibc 2.35 or newer and a desktop display is required; this is not an ARM or Alpine/musl build. Keep the adjacent `data` folder when replacing the AppImage. The old 1.1 Linux ZIP was a raw binary requiring system WebKitGTK; use the new AppImage instead.
 
 ## Build on Windows
 
@@ -56,7 +69,7 @@ npm ci
 bash build-linux.sh
 ```
 
-Use the native Linux Rust toolchain. The result is `tauri-app/desktop-app/llama-server-configurator`. A desktop display session is required to run the GUI. Linux compilation/runtime has not been verified on the current Windows desktop.
+Use the native Linux Rust toolchain. The result is `tauri-app/desktop-app/llama-server-configurator`. A desktop display session is required to run the GUI. This raw developer binary needs the system libraries above. For the distributable AppImage, run `bash package-appimage.sh` on Linux (the script uses pinned Tauri CLI 1.6.3 through npx). Native Linux CI passed for 1.1; 1.1.1 adds AppImage and clean-host packaging checks.
 
 ## MCP and router mode
 

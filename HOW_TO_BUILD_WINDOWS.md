@@ -7,7 +7,7 @@ Use the Rust/Tauri application in `tauri-app`. These instructions also apply to 
 - Node.js 22.12 or later and npm.
 - Rust 1.89 or later, using the stable Windows MSVC toolchain.
 - Visual Studio C++ Build Tools, the desktop C++ workload and Windows SDK.
-- WebView2 Runtime for an ordinary executable build, or the official Fixed Version x64 runtime for a portable ZIP.
+- WebView2 Runtime for an ordinary executable build, or the official Fixed Version x64 runtime for a setup EXE.
 
 Check the selected toolchain:
 
@@ -65,15 +65,15 @@ After editing option placement or descriptions, run `node tests/generate-setting
 
 Windows validation passed real inference, two-model router accounting, monitoring off, runtime install failure/retry, repeated start/stop and folder relocation. Opening the GUI alone does not prove inference works. No MCP tools are executed by verification.
 
-## Portable package
+## Setup executable
 
-From `tauri-app`, supply the extracted official x64 Fixed Version WebView2 folder:
+Install NSIS 3 first (makensis.exe). From `tauri-app`, supply the extracted official x64 Fixed Version WebView2 folder:
 
 ```powershell
-.\package-portable.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
+.\package-windows.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
 ```
 
-The packager includes the EXE, Fixed WebView2, licensed VC runtime DLLs, dependency notices and checksums. Engines, models and private data are excluded. For an already verified binary, `-SkipBuild -ExecutablePath 'target/release/llama-server-configurator.exe'` avoids replacing an open desktop copy. Read [PORTABLE_RELEASES.md](PORTABLE_RELEASES.md) for inputs, signing policy and clean-machine requirements.
+The setup packager writes `artifacts/release/LLamaLauncher-<version>-Windows-x86_64-Setup.exe`. It installs per user to a writable folder, adds shortcuts, and keeps `data` during updates/uninstall. It includes the EXE, Fixed WebView2, licensed VC runtime DLLs, dependency notices and checksums. Engines, models and private data are excluded. For an already verified binary, `-SkipBuild -ExecutablePath 'target/release/llama-server-configurator.exe'` avoids replacing an open desktop copy. Read [PORTABLE_RELEASES.md](PORTABLE_RELEASES.md) for inputs, signing policy and clean-machine requirements.
 
 ## Common failures
 

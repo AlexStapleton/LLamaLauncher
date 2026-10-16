@@ -1,16 +1,20 @@
 # Portable releases
 
-Windows distribution is a ZIP containing the application EXE, a private x64 Fixed Version WebView2 runtime. Extract the entire ZIP and run the EXE. The llama.cpp engine and models are installed separately through Launch and Models, or linked from existing files. Official engine downloads come directly from ggml-org/llama.cpp GitHub releases; the launcher does not ship a second CPU copy. The app creates data beside the EXE for profiles, settings, accounts, WebView state, logs, downloaded engines and default downloaded models. Distribution packages contain none of the developer’s data. Replace the EXE/WebView2 when updating and keep data. Windows private records are account-bound; Linux uses private permissions.
+The public downloads are a Windows **setup `.exe`** and Linux **`.AppImage`**, plus SHA256 checksums. Windows setup includes the private x64 Fixed Version WebView2 runtime and licensed VC runtime DLLs; it installs for the current user, adds shortcuts, and preserves `data` on upgrade and uninstall. The default installation is `%LOCALAPPDATA%\Programs\LLamaLauncher`, a writable location so profiles remain beside the EXE. Close the application and stop its server before updating. Choose an existing portable folder in setup or copy its protected `data` folder while closed to retain it; Windows credentials require the same Windows account.
+
+The AppImage bundles WebKitGTK and its process helpers; it does not require `libwebkit2gtk-4.0.so.37` from the host. Put it in a writable folder, `chmod +x` it and run it. Use `--appimage-extract-and-run` without FUSE. Its managed data is beside the original AppImage, outside the temporary mount. The supported baseline is Linux x86_64, glibc 2.35+, with a desktop session; broader distribution/GPU testing remains necessary.
+
+llama.cpp and model weights are installed separately through Launch and Models, or linked from existing files. Distribution packages never contain developer data. Windows private records are account-bound; Linux uses private permissions. Both packaging paths retain offline settings documentation and dependency licenses.
 
 Download the **Fixed Version x64** WebView2 CAB from https://developer.microsoft.com/en-us/microsoft-edge/webview2/ and accept Microsoft's redistribution terms. Extract it with Windows `expand.exe`, then provide its directory to the packaging script. Do not substitute the Evergreen installer or copy a system browser installation. Keep Microsoft notices and the runtime's license files in the package. Fixed WebView2 updates require a new launcher release.
 
-From `tauri-app` in PowerShell:
+Install NSIS 3 (makensis.exe). From `tauri-app` in PowerShell:
 
 ```powershell
-./package-portable.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
+./package-windows.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
 ```
 
-For Ubuntu/Debian x64, build an AppImage on Ubuntu 22.04 with Node 22.12+, Rust 1.89+, Tauri CLI 1.x, Tauri 1 system development libraries and `xvfb` installed. The script creates a configuration override under ignored artifacts, preserves `tauri.conf.json`, and runs a virtual-display smoke check of the AppImage's FUSE-free startup.
+For Ubuntu/Debian x64, build an AppImage on Ubuntu 22.04 with Node 22.12+, Rust 1.89+, Tauri 1 system development libraries and `xvfb` installed. The script invokes pinned Tauri CLI 1.6.3 through npx and creates a configuration override under ignored artifacts, preserves `tauri.conf.json`, and runs a virtual-display smoke check of the AppImage's FUSE-free startup.
 
 ```bash
 bash package-appimage.sh
@@ -28,7 +32,7 @@ The Windows packager also copies the licensed Microsoft VC x64 runtime DLLs from
 
 ## Current release policy
 
-The 1.1 release pipeline runs from a main-branch push whose commit message begins `Release 1.1`. Both Windows and Linux validation jobs must pass before the publisher creates tag `1.1`, uploads the platform archives/checksums and publishes a prerelease. Windows uses the pinned, checksum-verified and signature-checked Microsoft Fixed WebView2 155.0.4283.45 x64 runtime; the native Linux ZIP uses system GTK/WebKit libraries. This pipeline does not claim AppImage or clean-machine validation. See [1.1 release notes](RELEASE_NOTES_1.1.md).
+The 1.1.1 release pipeline runs from a main-branch push whose commit message begins `Release 1.1.1`. Both platform validation jobs must pass before creating tag `1.1.1` and publishing the setup EXE, AppImage and checksums. Windows tests installation, the real GUI using bundled WebView2, upgrade data preservation, and uninstall data preservation. Linux verifies WebKitGTK and WebKitWebProcess are inside the image, then starts it in a clean Ubuntu 24.04 container with no system WebKitGTK and no FUSE. Docker is required for this clean-host check. Windows uses pinned, checksum-verified and signature-checked Microsoft Fixed WebView2 155.0.4283.45 x64. See [1.1.1 release notes](RELEASE_NOTES_1.1.1.md). The existing 1.1 release/tag remains unchanged.
 
 Local Windows packages are unsigned beta builds until the platform/hardware acceptance gates in `PRODUCTION_READINESS_REVIEW.md` pass. A checksum verifies downloaded bytes; it does not establish publisher identity. Production Windows releases require an Authenticode certificate supplied through the release environment and signature verification before packaging. No signing key or certificate is stored in this repository. Linux distributions require a corresponding verified native/AppImage test report; preparing a workflow does not close that gate.
 

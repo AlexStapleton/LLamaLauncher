@@ -48,3 +48,10 @@ Publishing commits or pull requests must follow the user's authorization. The in
 - Stable follows the latest official non-prerelease and its published binary tag when needed. Beta follows prereleases. Never silently substitute Beta for Stable. Hardware/backend selection is automatic; only the release channel is a normal user choice.
 - Model folder/picker belongs in Models and stays visible in router mode. Single-model selection disables MCP for the next launch; preserve the connection profile itself.
 - Listen address/port belong in Launch. LAN preset binds 0.0.0.0; client previews must use the actual LAN IP or a clearly labeled placeholder, never claim 0.0.0.0 is a client URL. Preserve custom interface addresses and profile settings. Opt-in tests/native-lan.mjs needs LLAMA_LAUNCHER_EXE, LLAMA_SERVER_EXE and LLAMA_MODEL_FILE; it briefly opens an ephemeral LAN listener without changing firewall rules.
+
+## Public packaging (1.1.1+)
+
+- Publish Windows NSIS setup EXE and Linux AppImage, not raw executable ZIPs. Preserve previous release tags/assets.
+- `package-windows.ps1` stages known files and compiles `installer/windows.nsi`. Never package data or fixtures. Uninstall deletes only exact packaged paths and preserves data/unrecognized files. Installation is per user so adjacent data stays writable. Installer smoke runs only on an isolated CI runner.
+- `package-appimage.sh` invokes pinned @tauri-apps/cli 1.6.3 using an ignored configuration override; do not change tauri.conf.json. `release-linux.sh` verifies bundled WebKitGTK/helpers and requires Docker clean-host startup without WebKitGTK installed.
+- The native 1.1 Windows/Linux workflow completed successfully; older review statements about unexecuted Linux are historical. Do not claim broader AppImage/hardware/clean-machine checks passed without their own evidence.

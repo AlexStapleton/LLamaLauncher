@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory=$true)][string]$FixedWebView2Directory,
     [string]$VCRuntimeDirectory,
     [string]$ExecutablePath,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$StageOnly
 )
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
@@ -16,7 +17,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Dependency notice generation failed.' }
     & node tests/generate-settings-guide.mjs --check
     if ($LASTEXITCODE -ne 0) { throw 'Settings reference is stale.' }
-    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
     $stage = Join-Path $PSScriptRoot "artifacts/portable-$stamp/LLamaLauncher"
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
     if (-not $ExecutablePath) { $ExecutablePath='./desktop-app/llama-server-configurator.exe' }
@@ -56,6 +57,7 @@ Choose a GGUF in Models and press Use for single-model launch, then Start server
         $relative = $_.FullName.Substring($stage.Length + 1)
         "$( (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower() )  $relative"
     } | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding utf8
+    if ($StageOnly) { Write-Output "PACKAGE_STAGE=$stage"; return }
     $archive = Join-Path $PSScriptRoot "artifacts/LLamaLauncher-Windows-x64-$stamp.zip"
     Compress-Archive -LiteralPath $stage -DestinationPath $archive -CompressionLevel Optimal
     "$( (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLower() )  $(Split-Path -Leaf $archive)" | Set-Content -LiteralPath "$archive.sha256" -Encoding utf8

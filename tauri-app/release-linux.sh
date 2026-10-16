@@ -1,21 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-node -e 'if(JSON.parse(require("fs").readFileSync("package.json","utf8")).version!=="1.1.0")throw Error("Expected version 1.1.0")'
-node tests/generate-settings-guide.mjs --check
-node tests/generate-notices.mjs
-stage=artifacts/release-stage/LLamaLauncher
-mkdir -p "$stage" artifacts/release
-cp target/release/llama-server-configurator "$stage/"
-chmod +x "$stage/llama-server-configurator"
-cp ../LICENSE ../PORTABLE_RELEASES.md ../LLAMA_SETTINGS_GUIDE.md artifacts/THIRD_PARTY_NOTICES.txt "$stage/"
-cat > "$stage/START_HERE.txt" <<'TXT'
-Run ./llama-server-configurator on Linux x86_64 with GTK 3, WebKitGTK 4.0
-and AppIndicator libraries installed (Ubuntu 22.04 build target).
-This native ZIP is not an AppImage and does not bundle system GUI libraries.
-Choose/download llama.cpp in Launch and select a GGUF in Models.
-Keep data beside the executable when upgrading; model weights are not bundled.
-Read LLAMA_SETTINGS_GUIDE.md offline for setting explanations and examples.
-TXT
-(cd artifacts/release-stage && zip -qr ../release/LLamaLauncher-1.1-Linux-x86_64.zip LLamaLauncher)
-(cd artifacts/release && sha256sum LLamaLauncher-1.1-Linux-x86_64.zip > LLamaLauncher-1.1-Linux-x86_64.zip.sha256)
+# The shared workflow has already run the complete source checks.
+bash package-appimage.sh --skip-checks
+# Confirm the runtime that was missing in the old ZIP is actually inside.
+image=$(realpath "artifacts/release/LLamaLauncher-$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).version')-Linux-x86_64.AppImage")
+fixture=$(mktemp -d)
+(cd "$fixture" && "$image" --appimage-extract > extraction.log)
+[[ -n "$(find "$fixture/squashfs-root" -name 'libwebkit2gtk-4.0.so.37*' -print -quit)" ]] || { echo 'AppImage is missing WebKitGTK' >&2; exit 1; }
+[[ -n "$(find "$fixture/squashfs-root" -name 'WebKitWebProcess' -print -quit)" ]] || { echo 'AppImage is missing the WebKit process helper' >&2; exit 1; }
+bash tests/appimage-clean-host.sh "$image"

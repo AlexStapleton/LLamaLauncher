@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: tauri-app/package-lock.json
       - name: Linux system libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf xvfb
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf xvfb x11-utils
       - name: Rust toolchain
         run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component rustfmt --component clippy
       - uses: Swatinem/rust-cache@v2
@@ -60,15 +60,19 @@ jobs:
       - name: Native Linux window smoke check
         if: runner.os == 'Linux'
         run: xvfb-run -a bash tests/linux-window-smoke.sh
+      - name: Windows installer compiler
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
+        shell: pwsh
+        run: choco install nsis --version=3.11 -y --no-progress
       - name: Package Windows release with fixed WebView2
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
         shell: pwsh
         run: ./release-windows.ps1
-      - name: Package native Linux release
-        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+      - name: Package self-contained Linux AppImage
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
         run: bash release-linux.sh
       - uses: actions/upload-artifact@v7
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
         with:
           name: release-assets-${{ runner.os }}
           path: tauri-app/artifacts/release/*
@@ -83,13 +87,15 @@ jobs:
             tauri-app/artifacts/gui-*.png
             tauri-app/artifacts/gui-benchmark*.json
             tauri-app/artifacts/native-package-startup.json
+            tauri-app/artifacts/linux-window-stderr.log
+            tauri-app/artifacts/appimage-clean-host.log
             tauri-app/artifacts/THIRD_PARTY_NOTICES.txt
             README.md
             LICENSE
           if-no-files-found: error
   release:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -101,7 +107,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: Publish verified 1.1 archives and checksums
+      - name: Publish verified 1.1.1 installers and checksums
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node tauri-app/tests/publish-release.mjs
