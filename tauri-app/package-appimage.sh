@@ -14,9 +14,7 @@ node tests/generate-notices.mjs
 node tests/generate-settings-guide.mjs --check
 node tests/verify-glib-backport.mjs
 node tests/linux-package-inventory.mjs
-cat > artifacts/portable-config.json <<'JSON'
-{"bundle":{"active":true,"targets":["appimage"],"icon":["icons/icon.png"],"resources":["../LICENSE","../PORTABLE_RELEASES.md","../LLAMA_SETTINGS_GUIDE.md","artifacts/THIRD_PARTY_NOTICES.txt","artifacts/LINUX_PACKAGE_VERSIONS.txt"]}}
-JSON
+node tests/appimage-config.mjs
 export APPIMAGE_EXTRACT_AND_RUN=1
 npx --no-install tauri build --config artifacts/portable-config.json --bundles appimage -- --locked
 version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).version')

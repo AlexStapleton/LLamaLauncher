@@ -17,6 +17,16 @@ docker run --rm -v "$image:/input/LLamaLauncher.AppImage:ro" \
     cp /input/LLamaLauncher.AppImage /test/LLamaLauncher.AppImage
     chmod +x /test/LLamaLauncher.AppImage
     cd /test
+    mkdir dependency-check
+    (cd dependency-check && /test/LLamaLauncher.AppImage --appimage-extract > extraction.log)
+    appdir=/test/dependency-check/squashfs-root
+    paths=$(find "$appdir/usr" -type d \( -name lib -o -name x86_64-linux-gnu \) -print | paste -sd:)
+    missing=0
+    while IFS= read -r binary; do
+      report=$(LD_LIBRARY_PATH="$paths" ldd "$binary" 2>&1 || true)
+      if grep -q "not found" <<< "$report"; then echo "$binary"; echo "$report"; missing=1; fi
+    done < <(find "$appdir/usr" -type f \( -name llama-server-configurator -o -name WebKitWebProcess -o -name WebKitNetworkProcess -o -name WebKitGPUProcess \))
+    [[ $missing -eq 0 ]] || { echo "AppImage has unresolved clean-host dependencies" >&2; exit 1; }
     # Root in this disposable container needs the WebKit test-only sandbox override.
     export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
     dbus-run-session -- xvfb-run -a bash /input/window-smoke.sh /test/LLamaLauncher.AppImage

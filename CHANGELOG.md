@@ -8,6 +8,7 @@
 
 - Replace public ZIP downloads with a Windows setup `.exe` and Linux `.AppImage`.
 - Bundle WebKitGTK and its helper processes in the AppImage to fix missing `libwebkit2gtk-4.0.so.37` on the host. Require a clean Ubuntu 24.04 container startup check with no system WebKitGTK or FUSE.
+- Preserve the Windows HTTPS webview origin across the Tauri migration so browser preferences remain available. Explicitly bundle text-shaping libraries omitted by linuxdeploy and check all WebKit helpers for unresolved libraries on the clean host.
 - Per-user Windows setup includes Fixed WebView2/VC runtime, desktop/Start menu shortcuts, and exact-file uninstall that preserves profiles, downloaded models/engines and unrecognized files. Test GUI startup and upgrade/uninstall data preservation.
 - Keep settings beside the EXE/original AppImage. Preserve the published 1.1 tag/assets; publish the packaging fix under 1.1.1 with checksums.
 - Correct current documentation that still described the completed 1.1 Linux CI as unexecuted.

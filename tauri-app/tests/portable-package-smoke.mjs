@@ -44,6 +44,7 @@ try{
     browser=await until(()=>chromium.connectOverCDP(`http://127.0.0.1:${port}`,{timeout:5000}));
     const page=await until(()=>browser.contexts()[0]?.pages()[0]);
     await page.waitForFunction(()=>document.documentElement.dataset.ready==='true');
+    assert.equal(new URL(page.url()).origin,'https://tauri.localhost','Keep the Tauri 1 storage origin during migration');
     const actual=await page.evaluate(()=>window.__TAURI_INTERNALS__.invoke('storage_location'));
     assert.equal(path.resolve(actual),location);assert.ok(fs.existsSync(path.join(location,'webview')));
     assert.equal(await page.locator('#start_server').isVisible(),true);

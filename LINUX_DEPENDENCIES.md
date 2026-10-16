@@ -47,3 +47,5 @@ The framework/configuration migration is a separate functional change from the 1
 Dependency audit after migration: cargo-audit 0.22.2 against RustSec commit `479c888ce4401313bca61ba4aba2d0f6244c4a09` (2026-10-15) reports zero vulnerabilities and one unmaintained build-macro warning (`proc-macro-error` 1.0.4). The local GLib source fix is verified separately and is not covered by the path-dependency audit. npm install reports zero vulnerabilities. This is not a native Linux C-library vulnerability scan.
 
 Tauri 2 CSP retains the existing source restrictions and adds only its documented native IPC transports (`ipc:` and `http://ipc.localhost`) to connect-src. The GUI still has no arbitrary remote network/script permission.
+
+The first clean Ubuntu container check detected omitted libfribidi even though build-host AppImage startup passed. AppImage configuration now explicitly includes the system text-shaping library set and corresponding licenses. Clean-host checks also run ldd on the launcher and all WebKit helper executables before launching the GUI. The Windows window retains useHttpsScheme=true to preserve Tauri 1 browser storage origins.
