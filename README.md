@@ -48,7 +48,7 @@ If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; 
 
 ## Build on Windows
 
-Install Node.js 22.12 or later, the Windows MSVC Rust toolchain, Visual Studio C++ Build Tools/Windows SDK, and WebView2 Runtime. The frontend uses Vite 8 and TypeScript; the runtime uses Tauri 2.x. From this repository:
+Use the Node.js version in `.nvmrc` (currently stable 26.12.0), the Windows MSVC Rust toolchain, Visual Studio C++ Build Tools/Windows SDK, and WebView2 Runtime. Node is a build/test tool and is not needed to run the desktop app. The frontend uses Vite 8 and TypeScript; the runtime uses Tauri 2.x. From this repository:
 
 ```powershell
 cd tauri-app
@@ -131,3 +131,5 @@ Saved profiles, working settings, accounts, monitoring preferences, downloaded e
 Public Hugging Face searches and downloads need no account. For gated/private repositories, connect a read token in Connections; **Get a read token** opens Hugging Face account settings. Browser sign-in remains under advanced account settings and is disabled until a registered public OAuth client ID is entered. GGUF files appear next to search results; loading an optional model card no longer delays file selection. Action failures appear beside the relevant controls.
 
 Launch → **Saved data & recovery** shows save failures and damaged records. Retry retains pending edits; restore/reset preserves original protected bytes and restarts the app. Logs retain up to 60 MiB across stdout/stderr and backups. Keep `data` when updating the launcher. Build/package outputs are generated locally or obtained from GitHub Actions artifacts; ZIPs, models, private data and test outputs are not committed to this repository.
+
+Dependency currency, upgraded libraries, retained framework/native constraints, and validation evidence are recorded in [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md). The full locked graph is in [DEPENDENCY_INVENTORY.md](DEPENDENCY_INVENTORY.md).

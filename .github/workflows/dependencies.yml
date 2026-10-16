@@ -1,0 +1,42 @@
+name: Dependency review
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 15 * * 1'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: tauri-app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: rustup toolchain install stable --profile minimal
+      - run: npm ci
+      - name: Complete locked registry inventory
+        run: node tests/dependency-inventory.mjs
+      - name: External runtime and build inputs
+        run: node tests/upstream-inputs.mjs
+      - name: Verify GLib source backport
+        run: node tests/verify-glib-backport.mjs
+      - name: npm advisories
+        run: npm audit --json > artifacts/dependency-audit/npm-audit.json
+      - name: RustSec advisories
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo audit --json > artifacts/dependency-audit/rust-audit.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: dependency-review
+          path: |
+            tauri-app/artifacts/dependency-audit/*.json
+            tauri-app/artifacts/dependency-audit/*.md
+          if-no-files-found: error

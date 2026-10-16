@@ -20,12 +20,12 @@ jobs:
       run:
         working-directory: tauri-app
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: tauri-app/package-lock.json
       - name: Linux system libraries
@@ -33,7 +33,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev patchelf xvfb x11-utils
       - name: Rust toolchain
         run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component rustfmt --component clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: tauri-app -> target
           cache-on-failure: true
@@ -61,26 +61,26 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a bash tests/linux-window-smoke.sh
       - name: Windows installer compiler
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
-        run: choco install nsis --version=3.11 -y --no-progress
+        run: choco install nsis --version=3.13.0 -y --no-progress
       - name: Package Windows release with fixed WebView2
         timeout-minutes: 20
-        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         run: ./release-windows.ps1
       - name: Package self-contained Linux AppImage
         timeout-minutes: 20
-        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: bash release-linux.sh
-      - uses: actions/upload-artifact@v7
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.2')
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           name: release-assets-${{ runner.os }}
           path: tauri-app/artifacts/release/*
           compression-level: 0
           if-no-files-found: error
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: LLamaLauncher-${{ runner.os }}
@@ -92,6 +92,7 @@ jobs:
             tauri-app/artifacts/LINUX_PACKAGE_VERSIONS.txt
             tauri-app/artifacts/linux-window-stderr.log
             tauri-app/artifacts/appimage-clean-host.log
+            tauri-app/artifacts/WINDOWS_PACKAGE_VERSIONS.json
             tauri-app/artifacts/THIRD_PARTY_NOTICES.txt
             README.md
             LICENSE
@@ -104,12 +105,12 @@ jobs:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - name: Publish verified 1.1.2 installers and checksums
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

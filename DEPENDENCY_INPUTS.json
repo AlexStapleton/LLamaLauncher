@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-10-16T19:13:35.980Z",
+  "node": {
+    "pinned": "26.12.0",
+    "latest": "26.12.0",
+    "latestLts": "v24.22.0",
+    "policy": "Stable Current is used only for build/test tooling; Node is not shipped as an application runtime.",
+    "source": "https://nodejs.org/dist/index.json"
+  },
+  "webview2": {
+    "pinned": "155.0.4283.62",
+    "latestFixedX64": "155.0.4283.62",
+    "source": "https://developer.microsoft.com/en-us/microsoft-edge/webview2/"
+  },
+  "nsis": {
+    "pinned": "3.13",
+    "latest": "3.13",
+    "source": "https://nsis-dev.github.io/release-data/versions.json"
+  },
+  "webkit": {
+    "reviewedBuildBaseline": "2.52.6",
+    "latestStable": "2.54.1",
+    "source": "https://webkitgtk.org/",
+    "exception": "Ubuntu 24.04 binary compatibility; this older distro engine is a servicing gap, not proof of upstream currency or security."
+  },
+  "cargoAudit": {
+    "pinned": "0.22.2",
+    "latest": "0.22.2",
+    "source": "https://crates.io/api/v1/crates/cargo-audit"
+  },
+  "vcRuntime": {
+    "pinned": "14.51.36247.0",
+    "source": "https://aka.ms/vc14/vc_redist.x64.exe",
+    "review": "Check the signed latest vendor installer FileVersion; the package uses an immutable, hash-pinned official URL. Do not execute that installer to check freshness."
+  }
+}

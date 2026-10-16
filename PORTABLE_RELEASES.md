@@ -14,7 +14,7 @@ Install NSIS 3 (makensis.exe). From `tauri-app` in PowerShell:
 ./package-windows.ps1 -FixedWebView2Directory 'D:/BuildInputs/WebView2-fixed-x64'
 ```
 
-For Ubuntu/Debian x64, build an AppImage on Ubuntu 24.04 with Node 22.12+, Rust 1.89+, Tauri 2 system development libraries and `xvfb` installed. The script invokes the locked Tauri 2 CLI through npx and creates a configuration override under ignored artifacts, preserves `tauri.conf.json`, and runs a virtual-display smoke check of the AppImage's FUSE-free startup.
+For Ubuntu/Debian x64, build an AppImage on Ubuntu 24.04 with the Node version in `.nvmrc`, current stable Rust, Tauri 2 system development libraries and `xvfb` installed. The script invokes the locked Tauri 2 CLI through npx and creates a configuration override under ignored artifacts, preserves `tauri.conf.json`, and runs a virtual-display smoke check of the AppImage's FUSE-free startup. This asset's baseline is glibc 2.39 or newer; Debian 12/Ubuntu 22.04 are outside that target.
 
 ```bash
 bash package-appimage.sh
@@ -22,7 +22,7 @@ bash package-appimage.sh
 
 Run the AppImage directly. If FUSE is unavailable, use `./LLamaLauncher.AppImage --appimage-extract-and-run` or `APPIMAGE_EXTRACT_AND_RUN=1`. Launch provides a Stable/Beta choice and validates the available official backend candidates, with a verified CPU fallback. Device enumeration is not a substitute for the supported hardware/driver test matrix.
 
-Before release, test offline GUI startup, online engine installation, and a local CPU inference on a clean Windows x64 VM, Ubuntu 22.04/24.04 and Debian 12/13. Test a machine without installed WebView2, plus Linux without FUSE. Verify SHA256SUMS, upstream licenses, and dependency notices. A successful build is not proof that these clean-machine checks passed.
+Before release, test offline GUI startup, online engine installation, and a local CPU inference on a clean Windows x64 VM, Ubuntu 24.04 and Debian 13. Test a machine without installed WebView2, plus Linux without FUSE. Verify SHA256SUMS, upstream licenses, and dependency notices. A successful build is not proof that these clean-machine checks passed.
 
 ## Hugging Face browser sign-in
 
@@ -45,3 +45,5 @@ Updates replace the application and private WebView2 runtime while preserving `d
 Launch → Saved data & recovery shows working-save failures and damaged records. Retry saving retains the pending edits. Restore backup or Reset this record is an explicit action, preserves the original protected bytes, and restarts the application. Backups remain protected by the same Windows account (Linux: private permissions). Folder portability does not make Windows credentials readable by a different account.
 
 Server stdout and stderr each retain three files of at most 10 MiB, for a combined 60 MiB disk cap. Known credentials are scrubbed before writing. Custom arguments remain private in profiles; shareable JSON export deliberately omits custom executable/MCP arguments and authentication fields.
+
+The dependency pass after 1.1.2 refreshes Node, NSIS, Fixed WebView2 and app-local VC DLLs; see [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md) for exact pins and remaining native-library gaps. These source changes do not replace the published 1.1.2 assets. Ordinary main-branch builds now validate installers/AppImages, including clean Ubuntu 24.04 and Debian 13 startup, before a future release. The verified Microsoft runtime inputs are in tauri-app/runtime-inputs.json; Windows release packaging extracts current app-local VC DLLs from the signed bundle without installing a system runtime.

@@ -47,7 +47,7 @@ pub fn add(mut artifact: Artifact) -> Result<String, String> {
         format!("{}:{}:{}", artifact.kind, artifact.path, artifact.version).as_bytes(),
     );
 
-    artifact.id = format!("{}-{:x}", artifact.kind, hash);
+    artifact.id = format!("{}-{}", artifact.kind, crate::hashing::hex(hash));
 
     let id = artifact.id.clone();
 
@@ -393,7 +393,7 @@ pub async fn channel_plan(channel: &str) -> Result<Value, String> {
             .as_str()
             .and_then(|d| d.strip_prefix("sha256:"))
         {
-            if format!("{:x}", Sha256::digest(&text)) != digest {
+            if crate::hashing::hex(Sha256::digest(&text)) != digest {
                 return Err("Stable binary tag checksum mismatch".into());
             }
         }
@@ -955,7 +955,7 @@ async fn download_archive(
         return Err("Runtime archive incomplete".into());
     }
 
-    let digest = format!("{:x}", hash.finalize());
+    let digest = crate::hashing::hex(hash.finalize());
 
     if let Some(expected) = asset["digest"]
         .as_str()

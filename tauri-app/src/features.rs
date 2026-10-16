@@ -871,7 +871,7 @@ config.model_file.clone()}
 else{
 std::path::Path::new(&config.models_path).join(&config.model_file).to_string_lossy().into()}
 )?));
-let hash=format!("{:x}",<sha2::Sha256 as sha2::Digest>::digest(serde_json::to_vec(&effective).map_err(|e|e.to_string())?));
+let hash=crate::hashing::hex(<sha2::Sha256 as sha2::Digest>::digest(serde_json::to_vec(&effective).map_err(|e|e.to_string())?));
 
             let temp=server::State::default();
 active.0.lock().map_err(|e|e.to_string())?.benchmark_server=Some(temp.clone());

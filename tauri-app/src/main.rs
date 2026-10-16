@@ -14,6 +14,7 @@ mod downloads;
 mod features;
 mod framing;
 mod gguf;
+mod hashing;
 mod hub;
 mod jobs;
 mod logging;

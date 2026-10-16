@@ -349,7 +349,7 @@ pub fn hash(path: &Path, cancel: &AtomicBool) -> Result<String, String> {
         h.update(&buf[..n]);
     }
 
-    Ok(format!("{:x}", h.finalize()))
+    Ok(crate::hashing::hex(h.finalize()))
 }
 
 pub fn disk_space(path: &Path, required: u64) -> Result<(), String> {
@@ -942,7 +942,7 @@ mod tests {
             files: vec![DownloadFile {
                 name: "model.gguf".into(),
                 size: bytes.len() as u64,
-                sha256: format!("{:x}", Sha256::digest(bytes)),
+                sha256: crate::hashing::hex(Sha256::digest(bytes)),
             }],
         };
         let dir = directory(&plan).unwrap();

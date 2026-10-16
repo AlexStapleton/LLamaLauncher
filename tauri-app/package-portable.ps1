@@ -36,6 +36,7 @@ try {
             Copy-Item -LiteralPath $library.FullName -Destination $stage
         }
     } else { throw 'Supply the licensed x64 Microsoft VC runtime redistributable folder with -VCRuntimeDirectory.' }
+    & ./tests/windows-package-inventory.ps1 -Stage $stage
     Copy-Item -LiteralPath '../LICENSE','../PORTABLE_RELEASES.md','../LLAMA_SETTINGS_GUIDE.md' -Destination $stage
     Copy-Item -LiteralPath 'artifacts/THIRD_PARTY_NOTICES.txt' -Destination $stage
     @'

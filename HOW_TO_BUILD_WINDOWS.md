@@ -4,7 +4,7 @@ Use the Rust/Tauri application in `tauri-app`. These instructions also apply to 
 
 ## Prerequisites
 
-- Node.js 22.12 or later and npm.
+- Node.js 26.12.0 and bundled npm 11.20.0, matching `.nvmrc` and CI.
 - Rust 1.89 or later, using the stable Windows MSVC toolchain.
 - Visual Studio C++ Build Tools, the desktop C++ workload and Windows SDK.
 - WebView2 Runtime for an ordinary executable build, or the official Fixed Version x64 runtime for a setup EXE.

@@ -15,7 +15,7 @@ The active application is `tauri-app/`: Rust/Tauri 2 with a Vite frontend. Keep 
 - The compatible Linux glib backport is in `vendor/`; run `node tests/verify-glib-backport.mjs` and the optimized Linux regression. A Windows pass does not prove Linux readiness.
 - Preserve the existing Tauri security configuration; do not manually edit `tauri.conf.json`.
 - Build frontend assets before Rust: `npm ci`, `npm run build`.
-- Use Node 22.12 or later, Vite 8 and TypeScript. Run `npm run types:generate` when native DTOs change; typecheck rejects stale generated interfaces.
+- Use the stable build toolchain in `.nvmrc` (Node 26.12.0), Vite 8 and TypeScript. Node is not shipped in the desktop runtime. Run `npm run types:generate` when native DTOs change; typecheck rejects stale generated interfaces.
 - Keep the protected Tauri configuration and Cargo.lock unchanged. Build.rs rejects stale embedded frontend assets.
 - Run `cargo fmt --check`, `cargo clippy --all-targets --locked -- -D warnings`, unit/interface checks and a native release build. CI is prepared; distinguish prepared checks from remotely executed checks.
 - Windows: use `cargo +stable-x86_64-pc-windows-msvc build --release --locked`. The desktop's default GNU toolchain is missing dlltool. Do not confuse that with source failures.
@@ -57,3 +57,11 @@ Publishing commits or pull requests must follow the user's authorization. The in
 - The native 1.1 Windows/Linux workflow completed successfully; older review statements about unexecuted Linux are historical. Do not claim broader AppImage/hardware/clean-machine checks passed without their own evidence.
 
 - The user explicitly authorized the Tauri 2 migration for 1.1.1. The configuration is now schema 2; preserve its CSP and local main-window event capabilities. Do not reapply old Tauri 1 instructions. Linux uses WebKitGTK 4.1/libsoup 3 on Ubuntu 24.04. `tests/linux-package-inventory.mjs` gates the engine version and records the actual native package versions.
+
+## Dependency policy
+
+- Latest compatible stable is the default. See `DEPENDENCY_REVIEW.md` and the generated `DEPENDENCY_INVENTORY.json`/`.md`; do not claim a zero advisory count means every dependency is current.
+- Regenerate Cargo/npm locks through their package managers. Review major API changes; never force incompatible indirect versions globally to silence an outdated report.
+- `runtime-inputs.json` pins official Microsoft Fixed WebView2 and VC runtime downloads by immutable URL/hash. Verify publisher signatures, exact versions and x64 architecture. The VC recipe only extracts app-local DLLs; never install a system redistributable on the user's computer for packaging.
+- Preserve the existing Linux baseline until its compatibility target is explicitly changed. Clean AppImage checks cover Ubuntu 24.04 and Debian 13 without system WebKitGTK/FUSE. Native distro library servicing gaps are documented separately from Rust/npm advisories.
+- Ordinary main-branch dependency updates also build/test packages. Existing published release assets/tags remain immutable; packaging validation does not authorize republishing an existing version.
