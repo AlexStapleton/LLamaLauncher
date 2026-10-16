@@ -7,7 +7,8 @@ New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 $fixture=(Resolve-Path -LiteralPath $fixture).Path
 $installed=Join-Path $fixture 'Installed launcher'
 function Install-Package {
-    $process=Start-Process -FilePath $installer -ArgumentList "/S /D=$installed" -WindowStyle Hidden -Wait -PassThru
+    $process=Start-Process -FilePath $installer -ArgumentList "/S /D=$installed" -WindowStyle Hidden -PassThru
+    if (-not $process.WaitForExit(300000)) { $process.Kill(); throw 'Installer exceeded five minutes' }
     if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 }
 Install-Package
@@ -25,7 +26,8 @@ $unrelated=Join-Path $installed 'keep-unrelated.txt'
 Start-Sleep -Seconds 2
 Install-Package
 if ((Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash -ne $digest -or -not (Test-Path -LiteralPath $marker)) { throw 'Upgrade changed saved data' }
-$process=Start-Process -FilePath (Join-Path $installed 'Uninstall.exe') -ArgumentList "/S _?=$installed" -WindowStyle Hidden -Wait -PassThru
+$process=Start-Process -FilePath (Join-Path $installed 'Uninstall.exe') -ArgumentList "/S _?=$installed" -WindowStyle Hidden -PassThru
+if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'Uninstaller exceeded two minutes' }
 if ($process.ExitCode -ne 0) { throw "Uninstaller failed: $($process.ExitCode)" }
 if ((Test-Path -LiteralPath $env:LLAMA_LAUNCHER_EXE) -or (Test-Path -LiteralPath (Join-Path $installed 'WebView2/msedgewebview2.exe'))) { throw 'Uninstall left packaged application files' }
 if ((Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash -ne $digest -or -not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath $unrelated)) { throw 'Uninstall removed or changed user files' }

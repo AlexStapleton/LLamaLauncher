@@ -24,7 +24,7 @@ public static class LauncherSmokeWindow {
   }
 }
 '@
-$title=(Get-Content -LiteralPath (Join-Path $PSScriptRoot '../tauri.conf.json') -Raw | ConvertFrom-Json).tauri.windows[0].title
+$title=(Get-Content -LiteralPath (Join-Path $PSScriptRoot '../tauri.conf.json') -Raw | ConvertFrom-Json).app.windows[0].title
 $expectedBrowser=Join-Path $RuntimeFolder 'msedgewebview2.exe'
 $deadline=[DateTime]::UtcNow.AddSeconds(45)
 $lastNames=@();$lastError='';$shown=$false

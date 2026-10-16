@@ -39,7 +39,7 @@ try {
     Copy-Item -LiteralPath '../LICENSE','../PORTABLE_RELEASES.md','../LLAMA_SETTINGS_GUIDE.md' -Destination $stage
     Copy-Item -LiteralPath 'artifacts/THIRD_PARTY_NOTICES.txt' -Destination $stage
     @'
-Extract the entire folder, then run llama-server-configurator.exe.
+Run llama-server-configurator.exe from this folder.
 The private WebView2 folder must remain next to the executable.
 In Launch, browse to an existing llama-server.exe or choose Stable/Beta and press
 Download llama.cpp. The platform/hardware build is selected automatically.

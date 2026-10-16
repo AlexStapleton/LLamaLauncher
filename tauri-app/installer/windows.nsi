@@ -7,8 +7,9 @@ OutFile "${OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\LLamaLauncher"
 InstallDirRegKey HKCU "Software\LLamaLauncher" "InstallDir"
 RequestExecutionLevel user
-SetCompressor /SOLID lzma
-SetCompressorDictSize 32
+; WebView2 is large. Standard zlib keeps setup builds/installs fast and permits
+; independent extraction of files; no outer archive is required by the user.
+SetCompressor zlib
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey "ProductName" "LLamaLauncher"
 VIAddVersionKey "FileDescription" "LLamaLauncher Setup"

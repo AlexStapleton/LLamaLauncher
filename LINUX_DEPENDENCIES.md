@@ -49,3 +49,7 @@ Dependency audit after migration: cargo-audit 0.22.2 against RustSec commit `479
 Tauri 2 CSP retains the existing source restrictions and adds only its documented native IPC transports (`ipc:` and `http://ipc.localhost`) to connect-src. The GUI still has no arbitrary remote network/script permission.
 
 The first clean Ubuntu container check detected omitted libfribidi even though build-host AppImage startup passed. AppImage configuration now explicitly includes the system text-shaping library set and corresponding licenses. Clean-host checks also run ldd on the launcher and all WebKit helper executables before launching the GUI. The Windows window retains useHttpsScheme=true to preserve Tauri 1 browser storage origins.
+
+## Executed Linux package validation
+
+GitHub Actions [run 38944126774](https://github.com/AlexStapleton/LLamaLauncher/actions/runs/38944126774), Linux job 117118822627, passed all source/native/browser checks and AppImage packaging from commit `ba665dd91d9fdcd536b7b1cd2f0d2fe43a2804ec`. The clean Ubuntu 24.04 container had no installed WebKitGTK and used FUSE-free extraction; dependency checks for the launcher and WebKit helpers passed, the real window initialized, and frontend settings were saved beside the original AppImage. The bundled text-library fix was exercised. This is Linux startup evidence, not a GPU/driver or long-running inference certification.

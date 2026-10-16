@@ -50,7 +50,7 @@ jobs:
       - name: Native backend tests
         run: cargo +${{ matrix.toolchain }} test --release --locked
       - name: Browser runtime
-        run: npx playwright install --with-deps chromium --only-shell
+        run: npx playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium --only-shell
       - name: Interface regression checks
         run: npm run test:gui
       - name: Interface measurements
@@ -65,10 +65,12 @@ jobs:
         shell: pwsh
         run: choco install nsis --version=3.11 -y --no-progress
       - name: Package Windows release with fixed WebView2
+        timeout-minutes: 20
         if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
         shell: pwsh
         run: ./release-windows.ps1
       - name: Package self-contained Linux AppImage
+        timeout-minutes: 20
         if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release 1.1.1')
         run: bash release-linux.sh
       - uses: actions/upload-artifact@v7
