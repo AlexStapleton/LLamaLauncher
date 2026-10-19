@@ -1,8 +1,8 @@
 # LLamaLauncher
 
-A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Current source packages provide one portable Windows executable and one Linux AppImage. Published 1.1.2 downloads still use the earlier Windows setup format.
+A desktop launcher and configurator for llama.cpp, built with Rust/Tauri and a web frontend. Version 1.1.3 provides one portable Windows executable and one Linux AppImage.
 
-Version 1.1.2 packaging notes and download instructions are in [RELEASE_NOTES_1.1.2.md](RELEASE_NOTES_1.1.2.md). Publication is gated on both platform jobs; packages include checksums and dependency notices. Windows packages remain unsigned beta builds.
+Download [the latest release](https://github.com/AlexStapleton/LLamaLauncher/releases/latest). Packaging notes and instructions are in [RELEASE_NOTES_1.1.3.md](RELEASE_NOTES_1.1.3.md). Publication is gated on both platform jobs and clean-host AppImage checks; packages include checksums and dependency notices. The Windows executable is unsigned.
 
 ## Features
 
@@ -12,7 +12,7 @@ Version 1.1.2 packaging notes and download instructions are in [RELEASE_NOTES_1.
 - Persistent light/dark themes and pinned server controls/navigation.
 - MCP connection status, connection testing, tool discovery/search, and schema inspection. Connection tests do not execute tools.
 - Streamable HTTP MCP with optional bearer authentication, plus local stdio MCP executables. An included HTTP-to-stdio bridge supplies remote MCP servers to llama-server's native stdio integration.
-- Private records in `data` beside the executable: Windows DPAPI protection; Linux account-only permissions (not encryption).
+- Private records in `data` beside the Windows executable or Linux XDG directories: Windows DPAPI protection; Linux account-only permissions (not encryption).
 - Owned process-tree cleanup, JSON configuration import/export, and recent server logs.
 - Health-based loading/ready status, bounded MCP framing, cancellable model scans and lazy settings/help rendering.
 - Versioned configuration with legacy import migration and generated TypeScript native contracts.
@@ -31,7 +31,7 @@ See [portable release packaging](PORTABLE_RELEASES.md) for the Windows portable 
 
 See [optimization implementation and measurements](OPTIMIZATION_IMPLEMENTATION.md) for the changes, measured tradeoffs and remaining Linux verification.
 
-For the current fixes and validation, read the [production readiness review](PRODUCTION_READINESS_REVIEW.md) and [changelog](CHANGELOG.md). The earlier optimization reports are historical. Packages remain beta builds; the broader GPU/driver matrix, clean Windows deployment and extended soak testing remain release gates. The original 1.1 workflow passed on Windows and Linux; historical review entries retain their original scope.
+For scope and validation, read the [production readiness review](PRODUCTION_READINESS_REVIEW.md), [release notes](RELEASE_NOTES_1.1.3.md) and [changelog](CHANGELOG.md). Earlier optimization reports retain their historical scope. Automated checks cover the packaged GUI and clean Linux startup; broader GPU/driver coverage and extended soak testing remain outside that evidence.
 
 ## Download and run
 
@@ -40,8 +40,8 @@ Current source builds produce **LLamaLauncher-<version>-Windows-x86_64.exe**. Pu
 On Linux, download **Linux-x86_64.AppImage**, mark it executable and run:
 
 ```sh
-chmod +x LLamaLauncher-1.1.2-Linux-x86_64.AppImage
-./LLamaLauncher-1.1.2-Linux-x86_64.AppImage
+chmod +x LLamaLauncher-1.1.3-Linux-x86_64.AppImage
+./LLamaLauncher-1.1.3-Linux-x86_64.AppImage
 ```
 
 If FUSE is unavailable, add `--appimage-extract-and-run`. WebKitGTK is bundled; no host WebKitGTK 4.0 installation is required. Current source/test packages target Linux x86_64 with glibc 2.41 or newer and use XDG storage; the executable's directory need not be writable. Published 1.1.2 retains its earlier glibc 2.39 baseline and adjacent-data behavior. This is not an ARM or Alpine/musl build. The old 1.1 Linux ZIP was a raw binary requiring system WebKitGTK.

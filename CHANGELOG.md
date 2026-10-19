@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.3 — 2026-10-19
 
 - Follow XDG config/data/state/cache locations on Linux. Default GGUF downloads use `$XDG_DATA_HOME/llama-launcher/models` (`~/.local/share/llama-launcher/models` when unset); downloaded llama.cpp runtimes also use application data. The Models folder picker saves a custom download location. Preserve existing folder choices, import bounded old metadata/backups, retain original model/runtime files and treat retained runtimes as external imports.
 - Use the desktop system font, readable relative type sizes and layout rows that grow with text. Add a saved 90–200% Text size control and verify the main sections at large sizes and smaller window widths.

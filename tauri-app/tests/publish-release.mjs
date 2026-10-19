@@ -6,10 +6,10 @@ import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {execFileSync} from 'node:child_process';
 
-const repository='AlexStapleton/LLamaLauncher',tag='1.1.2';
+const repository='AlexStapleton/LLamaLauncher',tag='1.1.3';
 const token=process.env.GITHUB_TOKEN,sha=process.env.GITHUB_SHA;
 if(!token||process.env.GITHUB_REPOSITORY!==repository||process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_EVENT_NAME!=='push'||!/^[a-f0-9]{40}$/.test(sha||''))throw Error('Expected a trusted main-branch GitHub release job');
-if(JSON.parse(fs.readFileSync('tauri-app/package.json','utf8')).version!=='1.1.2')throw Error('Release version mismatch');
+if(JSON.parse(fs.readFileSync('tauri-app/package.json','utf8')).version!==tag)throw Error('Release version mismatch');
 const headers={Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
 async function api(suffix,method='GET',body){
   const response=await fetch(`https://api.github.com/repos/${repository}/${suffix}`,{method,headers:{...headers,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
@@ -35,7 +35,7 @@ for(const platform of ['Windows','Linux']){
 const sums='release-publish/SHA256SUMS.txt';fs.writeFileSync(sums,assets.filter(a=>!a.name.endsWith('.sha256')).map(a=>`${a.digest}  ${a.name}`).join('\n')+'\n');assets.push({file:sums,name:'SHA256SUMS.txt',digest:await hash(sums),size:fs.statSync(sums).size});
 const lookup=await fetch(`https://api.github.com/repos/${repository}/releases/tags/${tag}`,{headers});
 let release;
-if(lookup.status===404)release=await api('releases','POST',{tag_name:tag,target_commitish:sha,name:`LLamaLauncher ${tag}`,body:fs.readFileSync('RELEASE_NOTES_1.1.2.md','utf8')+`\n\nBuilt from commit ${sha}. Both platform jobs passed before publication.`,draft:true,prerelease:true,make_latest:'false'});
+if(lookup.status===404)release=await api('releases','POST',{tag_name:tag,target_commitish:sha,name:`LLamaLauncher ${tag}`,body:fs.readFileSync(`RELEASE_NOTES_${tag}.md`,'utf8')+`\n\nBuilt from commit ${sha}. Both platform jobs and clean-host AppImage checks passed before publication.`,draft:true,prerelease:false,make_latest:'false'});
 else {if(!lookup.ok)throw Error('Cannot inspect release');release=await lookup.json();if(release.target_commitish!==sha)throw Error('Existing release targets another commit');}
 for(const asset of assets){
   const existing=release.assets.find(a=>a.name===asset.name);
@@ -46,12 +46,5 @@ for(const asset of assets){
   if(uploaded.size!==asset.size||uploaded.digest!==`sha256:${asset.digest}`)throw Error('GitHub asset digest mismatch');
 }
 release=await api(`releases/${release.id}`);for(const asset of assets){const uploaded=release.assets.find(a=>a.name===asset.name);if(uploaded?.digest!==`sha256:${asset.digest}`)throw Error('Release asset verification failed');}
-if(release.draft)release=await api(`releases/${release.id}`,'PATCH',{draft:false,prerelease:true,make_latest:'false'});
-// Preserve old binaries/tags, but point users to the corrected uninstall setup.
-const previousResponse=await fetch(`https://api.github.com/repos/${repository}/releases/tags/1.1.1`,{headers});
-if(previousResponse.ok){
-  const previous=await previousResponse.json();
-  const notice=`> Superseded by [LLamaLauncher ${tag}](${release.html_url}), which fixes Windows Installed apps uninstall registration. If using 1.1.1, you can run Uninstall.exe directly from its installation folder. Existing assets and tag are unchanged.\n\n`;
-  if(!previous.body?.startsWith('> Superseded by [LLamaLauncher 1.1.2]'))await api(`releases/${previous.id}`,'PATCH',{body:notice+(previous.body||'')});
-}else if(previousResponse.status!==404)throw Error('Cannot update the superseded release notice');
+if(release.draft)release=await api(`releases/${release.id}`,'PATCH',{draft:false,prerelease:false,make_latest:'true'});
 console.log(JSON.stringify({release:release.html_url,tag,sha,prerelease:release.prerelease,assets:assets.map(a=>({name:a.name,sha256:a.digest}))}));

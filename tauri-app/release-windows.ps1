@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
     $releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
-    if($releaseVersion -ne '1.1.2'){throw 'This release recipe expects version 1.1.2'}
+    if($releaseVersion -ne '1.1.3'){throw 'This release recipe expects version 1.1.3'}
     $inputFolder=Join-Path $PSScriptRoot 'artifacts/release-inputs'
     New-Item -ItemType Directory -Path $inputFolder -Force | Out-Null
     $cab=Join-Path $inputFolder 'WebView2-fixed-x64.cab'

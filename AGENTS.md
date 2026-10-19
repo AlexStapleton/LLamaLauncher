@@ -17,6 +17,7 @@ The active application is `tauri-app/`: Rust/Tauri 2 with a Vite frontend. Keep 
 - Build frontend assets before Rust: `npm ci`, `npm run build`.
 - Use the stable build toolchain in `.nvmrc` (Node 26.12.0), Vite 8 and TypeScript. Node is not shipped in the desktop runtime. Run `npm run types:generate` when native DTOs change; typecheck rejects stale generated interfaces.
 - Keep the protected Tauri configuration and Cargo.lock unchanged. Build.rs rejects stale embedded frontend assets.
+- Release version updates use `npm version <version> --no-git-tag-version --ignore-scripts`, then `node tests/set-release-version.mjs`. This generator updates only native version fields and preserves every other Tauri configuration value. Let Cargo regenerate its own package entry in Cargo.lock; use `--locked` afterward. Never rewrite security settings for a version bump.
 - Run `cargo fmt --check`, `cargo clippy --all-targets --locked -- -D warnings`, unit/interface checks and a native release build. CI is prepared; distinguish prepared checks from remotely executed checks.
 - Windows: use `cargo +stable-x86_64-pc-windows-msvc build --release --locked`. The desktop's default GNU toolchain is missing dlltool. Do not confuse that with source failures.
 - Linux: use its native Rust toolchain and install Tauri 2 system libraries. Keep Windows-only APIs behind `#[cfg(windows)]` and Unix APIs behind `#[cfg(unix)]`.
